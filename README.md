@@ -4,6 +4,8 @@ ESP32 device send data monitoring in JSON format to MQTT server
 ## Description
 This project uses an ESP32 to control fans based on the temperature measured by a DS18B20 sensor. It connects to a WiFi network and uses MQTT for communication with a MQTT server or broker. The ESP32 send to the broker the data in JSON format.
 
+![System Diagram](images/fan-controller-power-plant.png)
+
 ## Features
 - WiFi connection.
 - MQTT connection and communication.

@@ -147,7 +147,7 @@ public:
     
     virtual ~Sensor() {
         if (_label != nullptr)  delete[] _label;
-        if (_topic != nullptr)  delete[] _topic;
+        if (_topic != nullptr)  free((void*)_topic);   /*strdup() -> free()*/
         if (_model != nullptr)  delete[] _model;
     };   /*Destructor*/
 
@@ -176,7 +176,7 @@ public:
         _label = strdup(label);
     }
     void setTopic(const char* topic){
-        if (_topic != nullptr)  delete[] _topic;    /*Liberar la memoria antigua si es necesario*/
+        if (_topic != nullptr)  free((void*)_topic);   /*strdup() -> free()*/    /*Liberar la memoria antigua si es necesario*/
         _topic = strdup(topic);                     /*Crear una nueva copia del topic*/
     }
 

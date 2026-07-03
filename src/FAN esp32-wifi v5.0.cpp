@@ -22,6 +22,7 @@ Credentials live in include/secrets.h (gitignored). Copy
 include/secrets.h.example and fill in real values.*/
 /*========================================================*/
 #include "secrets.h"
+#include "ca_cert.h"
 #define MQTT_ID "Controller-iot"
 #define MQTT_TOPIC_SUB "/FAN/control"
 #define MQTT_TOPIC_PUB "/FAN/monitoring"
@@ -124,12 +125,16 @@ void setup(){
   mqtt.setId(mqtt_ID.c_str());
 
   if(wifi_connect(ssid,password,5)){
-    WIFIClient.setInsecure();
+    #ifdef MQTT_TLS_INSECURE
+    WIFIClient.setInsecure();   /*Diagnostics only: no certificate validation*/
+    #else
+    WIFIClient.setCACert(CA_CERT);
+    #endif
     if(mqtt.connect(1)){
       //mqtt.client.setCallback(callback);
       mqtt.subscribe();
-      const char* welcome = ("Hello I am " + mqtt_ID).c_str();
-      mqtt.client.publish(mqtt_topic_pub,welcome);
+      String welcome = "Hello I am " + mqtt_ID;
+      mqtt.client.publish(mqtt_topic_pub,welcome.c_str());
     }
   } 
 
@@ -302,7 +307,11 @@ void loop() {
     /*Codigo para conexion MQTT y envio de Data
     /*================================================================*/
     if(wifi_check_connection(ssid,password,2)){
+      #ifdef MQTT_TLS_INSECURE
       WIFIClient.setInsecure();
+      #else
+      WIFIClient.setCACert(CA_CERT);
+      #endif
       if(mqtt.checkConnection(1)){
         mqtt.publish(true,controller.toJson());
       }

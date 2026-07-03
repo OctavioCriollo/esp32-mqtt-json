@@ -1,6 +1,6 @@
 #include <PubSubClient.h>
-#include <MQTTPubSubClient.h>
 #include <ArduinoJson.h>
+#include <vector>
 
 class MQTT{
 private:
@@ -76,16 +76,17 @@ public:
         _topicSUB = topicSUB;
     }
     void setBufferSize(size_t bufferSize){
+        _bufferSize = bufferSize;           /*Update BEFORE applying: the old
+        order applied the previous value to the client (off-by-one-call bug).*/
         client.setBufferSize(_bufferSize);
-        _bufferSize = bufferSize;
     }
     
     bool publish(bool event, JsonDocument doc){
         if(!event)
             return false;
-        char buffer[_bufferSize];
-        size_t n = serializeJson(doc,buffer,sizeof(buffer));
-        client.publish(_topicPUB,buffer,n);
+        std::vector<char> buffer(_bufferSize);   /*heap, not a 2KB stack VLA*/
+        size_t n = serializeJson(doc,buffer.data(),buffer.size());
+        client.publish(_topicPUB,(const uint8_t*)buffer.data(),n,false);
 
         Serial.printf("\nSENT MESSAGE:");
         Serial.printf("\nBROKER: %s",_server);
@@ -116,7 +117,6 @@ public:
         Serial.printf("* Broker: %s\n",_server);
         Serial.printf("* Port: %d\n",_port);
         Serial.printf("* MQTT User: %s\n",_user);
-        Serial.printf("* MQTT Pass: %s\n",_password);
         Serial.printf("* MQTT ID: %s\n",_id);
         Serial.println();
         subscribe();
@@ -183,64 +183,3 @@ bool mqtt_check_connection(PubSubClient& MQTTClient, String mqttClientID, const 
         return true;
     return mqtt_connect(MQTTClient,mqttClientID,mqttServer,mqttPort,mqttUser,mqttPass,1);
 }
-
-
-/*==================================================================================================================================================*/
-/*Implementaciones con la biblioteca MQTTPubSubClient: Aun en desarrollo*/
-/*==================================================================================================================================================*/
-bool mqtt_wifi_connect(WiFiClientSecure& WIFIClient, MQTTPubSubClient& MQTTClient, const char* mqttServer, uint16_t mqttPort, int waitConnect){
-    Serial.print("\nConnecting to MQTT broker");
-    WIFIClient.setInsecure();
-    for (int i=1; i<=waitConnect; i++){
-        Serial.print(".");
-        delay(200);
-        if(WIFIClient.connect(mqttServer,mqttPort)){
-            Serial.println(" SUSSCEFUL!!!");
-            Serial.printf("* Broker: %s\n",mqttServer);
-            Serial.printf("* Port: %d\n",mqttPort);
-            MQTTClient.begin(WIFIClient);
-            return true;
-        }
-    }
-    Serial.println(" NO CONNECTED!!!\n"); 
-    return false;
-}
-
-bool mqtt_broker_connect(MQTTPubSubClient& MQTTClient, String mqttClientID,const char* mqttUser,const char* mqttPass, int waitConnect){
-    Serial.print("\nStar sesion to MQTT broker");
-    mqttClientID += "(" + String(WiFi.macAddress()) + ")";
-    for(int i=1; i<=waitConnect; i++){
-        Serial.print(".");
-        delay(200);
-        if(MQTTClient.connect(mqttClientID,mqttUser,mqttPass))
-            break;
-    }
-
-    if(!MQTTClient.isConnected()){
-        Serial.println(" NO CONNECTED!!!\n"); 
-        return false;
-    }    
-    Serial.println(" SUSSCEFUL!!!");
-    Serial.printf("* MQTT User: %s\n",mqttUser);
-    Serial.printf("* MQTT Pass: %s\n",mqttPass);
-    Serial.printf("* MQTT ID: %s\n",mqttClientID.c_str());
-    Serial.println(); 
-    return true;
-}
-
-bool MQTTpublish(bool event, JsonObject& obj, MQTTPubSubClient& MQTTClient, const char* topic){
-    if(!event)
-        return false;
-    char buffer[2048];
-    size_t n = serializeJson(obj,buffer);
-    /*============================================*/
-    Serial.printf("\nTOPIC: %s",topic);
-    Serial.printf("\nMESSAGE Send:\n");
-    serializeJson(obj,Serial);
-    //serializeJsonPretty(obj,Serial);
-    Serial.println();
-    /*============================================*/
-    MQTTClient.publish(topic,buffer,n);
-    return true;
-}
-/*==================================================================================================================================================*/

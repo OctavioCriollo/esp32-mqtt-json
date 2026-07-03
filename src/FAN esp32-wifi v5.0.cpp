@@ -114,6 +114,12 @@ void IRAM_ATTR isr2(){
   tachMon2.count();
 }
 */
+/*Item F globals: defined here so setup() can reference them; the task
+implementation lives after the control-cycle function below.*/
+SemaphoreHandle_t stateMutex;
+TaskHandle_t controlTaskHandle;
+void controlTask(void*);
+
 void setup(){
   serial_setup(115200);
   mqtt.setServer(mqtt_server);
@@ -210,9 +216,6 @@ so blocking WiFi/MQTT reconnects in loop() can NEVER freeze thermal
 control. Shared device objects are guarded by stateMutex; the network
 side only holds it long enough to deep-copy a JSON snapshot.
 ==================================================================*/
-SemaphoreHandle_t stateMutex;
-TaskHandle_t controlTaskHandle;
-
 void runControlCycle(){
 bool doorCabinet = doorOpenMon.readPin();
 float tempCabinet = temp1.readTemperature();

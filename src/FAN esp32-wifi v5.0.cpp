@@ -10,6 +10,7 @@ Copyright (c) 2023 Octavio Criollo.
 #include "mqtt-NT.h"
 #include "IoT-NT.h"
 #include <arduino-timer.h>
+#include <esp_task_wdt.h>
 
 /*PWM variables
 ==============================*/
@@ -143,8 +144,18 @@ void setup(){
   fan2.write(PWM_MAX);
   fanAlarm.on();
 
-  while(!temp1.tryConnection())
+  /*Degraded boot (item E): a missing/broken DS18B20 must NOT hang the
+  device forever. Bounded attempts; on failure the fans stay at PWM_MAX
+  (failsafe set above), the alarm relay fires, and boot continues so the
+  failure is REPORTED over MQTT instead of silencing the controller.*/
+  bool sensorOk = false;
+  for (int i = 0; i < 10 && !(sensorOk = temp1.tryConnection()); i++)
     delay(1000);
+  if (!sensorOk) {
+    temp1.setAlm(ALARM);
+    temp1.setCode("Sensor Failure!");
+    Serial.println("\nDS18B20 NOT FOUND: degraded boot, fans at 100%");
+  }
   fanAlarm.writePin(not temp1.status.alm());
   temp1.setUpper(HIGH_TEMP);
   temp1.setLower(LOW_TEMP);
@@ -160,6 +171,19 @@ void setup(){
   controller.sensors = sensors;
   controller.actuators = actuators;
  
+  /*Hardware watchdog (item E): if the main loop wedges (e.g. a stuck TLS
+  handshake or a driver fault), reboot instead of leaving a frozen
+  controller in the cabinet. Arduino core may pre-initialize the TWDT, so
+  fall back to reconfigure.*/
+  esp_task_wdt_config_t wdt_cfg = {
+      .timeout_ms = 30000,
+      .idle_core_mask = 0,
+      .trigger_panic = true,
+  };
+  if (esp_task_wdt_init(&wdt_cfg) == ESP_ERR_INVALID_STATE)
+    esp_task_wdt_reconfigure(&wdt_cfg);
+  esp_task_wdt_add(NULL);   /*register the Arduino loop task*/
+
   last_time = millis();
   //last_wifi_event_time = millis();  //Last wifi event time
   //last_mqtt_event_time = millis();  //Last MQTT event time
@@ -176,6 +200,7 @@ void setup(){
 }
 
 void loop() {
+  esp_task_wdt_reset();
   current_time = millis();
   bool doorCabinet;
   float tempCabinet;

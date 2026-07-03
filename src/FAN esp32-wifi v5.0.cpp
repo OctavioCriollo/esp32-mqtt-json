@@ -24,21 +24,23 @@ include/secrets.h.example and fill in real values.*/
 /*========================================================*/
 #include "secrets.h"
 #include "ca_cert.h"
+#include "config-NT.h"
 #define MQTT_ID "Controller-iot"
 #define MQTT_TOPIC_SUB "/FAN/control"
 #define MQTT_TOPIC_PUB "/FAN/monitoring"
 
-const char* ssid = WIFI_SSID;
-const char* password = WIFI_PASSWORD;  
+ConfigStore configStore;   /*NVS-backed runtime config (item G)*/
+const char* ssid;          /*bound to configStore.cfg after load()*/
+const char* password;  
 String ip;
 const char* ntpServer = "pool.ntp.org";
 WiFiUDP ntpUDP;
 /*========================================================*/
 
-const char* mqtt_server = MQTT_SERVER;
-uint16_t mqtt_port = MQTT_PORT;
-const char* mqtt_user = MQTT_CLIENT_USER;
-const char* mqtt_password = MQTT_CLIENT_PASS;
+const char* mqtt_server;
+uint16_t mqtt_port;
+const char* mqtt_user;
+const char* mqtt_password;
 const char* mqtt_topic_pub = MQTT_TOPIC_PUB;
 const char* mqtt_topic_sub = MQTT_TOPIC_SUB;
 String mqtt_ID = MQTT_ID;
@@ -46,8 +48,6 @@ String mqtt_ID = MQTT_ID;
 WiFiClientSecure WIFIClient;
 MQTT mqtt(WIFIClient);
 
-#define HIGH_TEMP 43    /*DC = 100%*/
-#define LOW_TEMP 24     /*DC = 0%*/
 #define ON LOW
 #define OFF HIGH
 
@@ -122,6 +122,15 @@ void controlTask(void*);
 
 void setup(){
   serial_setup(115200);
+
+  /*Item G: runtime config from NVS (compile-time defaults on first boot)*/
+  configStore.load();
+  ssid          = configStore.cfg.wifiSsid;
+  password      = configStore.cfg.wifiPass;
+  mqtt_server   = configStore.cfg.mqttServer;
+  mqtt_port     = configStore.cfg.mqttPort;
+  mqtt_user     = configStore.cfg.mqttUser;
+  mqtt_password = configStore.cfg.mqttPass;
   mqtt.setServer(mqtt_server);
   mqtt.setPort(mqtt_port);
   mqtt.setUser(mqtt_user);
@@ -163,8 +172,8 @@ void setup(){
     Serial.println("\nDS18B20 NOT FOUND: degraded boot, fans at 100%");
   }
   fanAlarm.writePin(not temp1.status.alm());
-  temp1.setUpper(HIGH_TEMP);
-  temp1.setLower(LOW_TEMP);
+  temp1.setUpper(configStore.cfg.highTemp);
+  temp1.setLower(configStore.cfg.lowTemp);
 
   sensors.add(&temp1);
   sensors.add(&doorOpenMon);
@@ -217,35 +226,38 @@ control. Shared device objects are guarded by stateMutex; the network
 side only holds it long enough to deep-copy a JSON snapshot.
 ==================================================================*/
 void runControlCycle(){
+  /*Dynamic thresholds (item G): editable at runtime via config*/
+  const float HIGH_T = configStore.cfg.highTemp;
+  const float LOW_T  = configStore.cfg.lowTemp;
 bool doorCabinet = doorOpenMon.readPin();
 float tempCabinet = temp1.readTemperature();
 
 /*PROCESSING PARAMETERS
 ======================================================*/
 if(temp1.isConnected()){
-  if(tempCabinet > HIGH_TEMP){
+  if(tempCabinet > HIGH_T){
     fan1.write(PWM_MAX);
     fan2.write(PWM_MAX);
     temp1.setAlm(ALARM);
     temp1.setCode("High Temperature");
   }
-  if(tempCabinet < LOW_TEMP){
+  if(tempCabinet < LOW_T){
     temp1.setCode("Low Temperature");
   }
-  if(tempCabinet < LOW_TEMP - n/(1-n)*(HIGH_TEMP-LOW_TEMP)){
+  if(tempCabinet < LOW_T - n/(1-n)*(HIGH_T-LOW_T)){
     fan1.write(PWM_MIN);
     fan2.write(PWM_MIN);
   }
-  if(tempCabinet >= (LOW_TEMP - n/(1-n)*(HIGH_TEMP-LOW_TEMP)) and tempCabinet <= HIGH_TEMP){
-    temp1.setAlm(tempCabinet > (HIGH_TEMP - TEMP_HISTERESIS) and temp1.alm());
-    //pwm = 100.00/(float)(HIGH_TEMP-LOW_TEMP)*(tempCabinet-(float)LOW_TEMP); //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_TEMP)
-    pwm = PWM_MAX*(1-n)/(HIGH_TEMP-LOW_TEMP)*(tempCabinet-LOW_TEMP) + n*PWM_MAX; //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_TEMP)
+  if(tempCabinet >= (LOW_T - n/(1-n)*(HIGH_T-LOW_T)) and tempCabinet <= HIGH_T){
+    temp1.setAlm(tempCabinet > (HIGH_T - TEMP_HISTERESIS) and temp1.alm());
+    //pwm = 100.00/(float)(HIGH_T-LOW_T)*(tempCabinet-(float)LOW_T); //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
+    pwm = PWM_MAX*(1-n)/(HIGH_T-LOW_T)*(tempCabinet-LOW_T) + n*PWM_MAX; //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
     pwm = round(pwm*100)/100;
     fan1.write(pwm);
     fan2.write(pwm);
-    if(tempCabinet >= LOW_TEMP and tempCabinet <= HIGH_TEMP and !temp1.alm())
+    if(tempCabinet >= LOW_T and tempCabinet <= HIGH_T and !temp1.alm())
       temp1.setCode("Temperature OK"); 
-    if (tempCabinet > (HIGH_TEMP - TEMP_HISTERESIS) and tempCabinet <= HIGH_TEMP and temp1.alm())
+    if (tempCabinet > (HIGH_T - TEMP_HISTERESIS) and tempCabinet <= HIGH_T and temp1.alm())
       temp1.setCode("Temperature decreasing");
   } 
 }
@@ -265,10 +277,10 @@ if(doorCabinet == OPEN){
 }
 else{
   doorOpenAlarm.status.setCode("Door is CLOSE");
-  if(!fan1.status.alm() and tempCabinet > LOW_TEMP*(1 + 0.06)) fan1.status.setCode("FAN1 ON");  /*check here*/
-  else if (tempCabinet < LOW_TEMP)  fan1.status.setCode("FAN1 OFF");   
-  if(!fan2.status.alm() and tempCabinet > LOW_TEMP*(1 + 0.06)) fan2.status.setCode("FAN2 ON");
-  else if (tempCabinet < LOW_TEMP)  fan2.status.setCode("FAN2 OFF"); 
+  if(!fan1.status.alm() and tempCabinet > LOW_T*(1 + 0.06)) fan1.status.setCode("FAN1 ON");  /*check here*/
+  else if (tempCabinet < LOW_T)  fan1.status.setCode("FAN1 OFF");   
+  if(!fan2.status.alm() and tempCabinet > LOW_T*(1 + 0.06)) fan2.status.setCode("FAN2 ON");
+  else if (tempCabinet < LOW_T)  fan2.status.setCode("FAN2 OFF"); 
   
   /*
   if(tachMon1.rpm() == 0){

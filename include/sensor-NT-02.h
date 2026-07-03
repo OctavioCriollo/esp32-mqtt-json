@@ -746,8 +746,9 @@ public:
         const char* topic = str.c_str();
         setTopic(topic);
         setModel(PWM_MODEL);
-        ledcSetup(channel,freq,resolution);
-        ledcAttachPin(pin,channel);
+        /*Arduino core 3.x LEDC API: attach with explicit channel; writes
+        are addressed by pin instead of channel.*/
+        ledcAttachChannel(pin,freq,resolution,channel);
         _range = pow(2,_resolution)-1.0f;
     }
 
@@ -776,7 +777,7 @@ public:
     =========================================*/
     void write(float value){
         //int range = pow(2,_resolution)-1;
-        ledcWrite(_channel, map(value,_low,_high,0.0f,_range));
+        ledcWrite(_pin, map(value,_low,_high,0.0f,_range));
         _value = value;
     }
 

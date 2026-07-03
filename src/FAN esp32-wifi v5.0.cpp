@@ -99,7 +99,7 @@ bool timerCallback(void *){
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.printf("\n TOPIC: %s",topic);
   Serial.print("\nRECEIVED MESSAGE:\n");
-  DynamicJsonDocument doc(2048);
+  JsonDocument doc;
   deserializeJson(doc,(const byte*)payload,length);
   serializeJson(doc,Serial);
   Serial.println();

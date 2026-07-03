@@ -80,7 +80,7 @@ public:
         _bufferSize = bufferSize;
     }
     
-    bool publish(bool event, DynamicJsonDocument doc){
+    bool publish(bool event, JsonDocument doc){
         if(!event)
             return false;
         char buffer[_bufferSize];
@@ -131,7 +131,7 @@ public:
         Serial.printf("\nRECEIVED MESSAGE:");
         Serial.printf("\nBROKER: %s",_server);
         Serial.printf("\nTOPIC: %s\n",topic);
-        DynamicJsonDocument doc(_bufferSize);
+        JsonDocument doc;
         deserializeJson(doc,(const byte*)payload,length);
         serializeJson(doc,Serial);
         Serial.println();
@@ -142,7 +142,7 @@ public:
   Dado que esta publicando un JSON la funcion interna MQTTClient.publish tiene limitacion en capacidad por lo que se debe dar mayor 
   tamaño al buffer de MQTT. Le damos tambien el mismo tamaño a buffer que es donde se almacenara el JSON y luego se publicara este buffer.
 ===========================================================================================================================================*/
-bool mqtt_publish(bool event, DynamicJsonDocument doc, PubSubClient& MQTTClient, size_t mqttBufferSize, const char* mqtt_topic_pub){
+bool mqtt_publish(bool event, JsonDocument doc, PubSubClient& MQTTClient, size_t mqttBufferSize, const char* mqtt_topic_pub){
     if(!event)
         return false;
     char buffer[mqttBufferSize];

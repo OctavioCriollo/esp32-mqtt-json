@@ -115,8 +115,8 @@ public:
     
     /*ARDUINO-JSON: Convert Class Status to JSON
     =================================================*/ 
-    DynamicJsonDocument toJson() {
-        DynamicJsonDocument doc(512);
+    JsonDocument toJson() {
+        JsonDocument doc;
         doc["code"] = _code;
         doc["alm"] = _alm;
         //return doc.as<JsonObject>();
@@ -193,8 +193,8 @@ public:
     
     /*ARDUINO-JSON: Convert Class Sensor to JSON
     =============================================*/ 
-    virtual DynamicJsonDocument toJson(){
-        DynamicJsonDocument doc(1024);
+    virtual JsonDocument toJson(){
+        JsonDocument doc;
         return doc;
     }
 };
@@ -314,7 +314,7 @@ public:
     }
     const JsonArray& address() {
         const size_t capacity = JSON_ARRAY_SIZE(sizeof(_addr));
-        DynamicJsonDocument doc(capacity);
+        JsonDocument doc;
         JsonArray array = doc.to<JsonArray>();
         for (size_t i=0;i<sizeof(_addr);i++){
             array.add(_addr[i]);
@@ -337,8 +337,8 @@ public:
    
     /*ARDUINO-JSON: Convert Class DS18B20 to JSON
     ==================================================*/ 
-    DynamicJsonDocument toJson() override{
-        DynamicJsonDocument doc(1024);
+    JsonDocument toJson() override{
+        JsonDocument doc;
         doc["id"] = id();
         doc["model"] = model();
         doc["temperature"] = _temperature; 
@@ -410,8 +410,8 @@ public:
 
     /*ARDUINO-JSON: Convert Class BME280 to JSON
     ==============================================*/ 
-       DynamicJsonDocument toJson() override{
-        DynamicJsonDocument doc(1024);
+       JsonDocument toJson() override{
+        JsonDocument doc;
         doc["id"] = id();
         doc["model"] = model();           
         //Code 
@@ -473,8 +473,8 @@ public:
 
     /*ARDUINO-JSON: Convert Class DTH22 to JSON
     ==================================================*/
-    DynamicJsonDocument toJson() override{
-        DynamicJsonDocument doc(1024);
+    JsonDocument toJson() override{
+        JsonDocument doc;
         doc["id"] = id();
         doc["model"] = model();            
         //doc["label"] = label();
@@ -516,8 +516,8 @@ public:
 
     /*ARDUINO-JSON: Convert Class PINSTATE to JSON
     ==================================================*/
-    DynamicJsonDocument toJson() override{
-        DynamicJsonDocument doc(1024);
+    JsonDocument toJson() override{
+        JsonDocument doc;
         doc["id"] = id();
         doc["model"] = model();     
         doc["state"] = _state;
@@ -592,8 +592,8 @@ public:
        
     /*ARDUINO-JSON: Convert Class TACHOMETER to JSON
     ==================================================*/
-    DynamicJsonDocument toJson() override{
-        DynamicJsonDocument doc(1024);
+    JsonDocument toJson() override{
+        JsonDocument doc;
         doc["id"] = id();
         doc["model"] = model();     
         doc["pulses"] = pulses();
@@ -637,8 +637,8 @@ public:
         
     /*ARDUINO-JSON: Convert Class Sensors to JSON
     =================================================================*/
-    DynamicJsonDocument toJson() {
-        DynamicJsonDocument doc(2048);
+    JsonDocument toJson() {
+        JsonDocument doc;
         JsonObject obj = doc.to<JsonObject>();
         for (const auto& entry : _map) {
             for (Sensor* sensor : entry.second) {
@@ -718,8 +718,8 @@ public:
     
     /*METHOD virtuales: ARDUINO-JSON
     ========================================*/ 
-    virtual DynamicJsonDocument toJson(){
-        DynamicJsonDocument doc(1024);
+    virtual JsonDocument toJson(){
+        JsonDocument doc;
         return doc;
     }
 };
@@ -783,8 +783,8 @@ public:
 
     /*ARDUINO-JSON: Convert Class PWM to JSON
     ===========================================*/
-    DynamicJsonDocument toJson() override{
-        DynamicJsonDocument doc(512);
+    JsonDocument toJson() override{
+        JsonDocument doc;
         doc["id"] = id();
         doc["value"] = _value;
         doc["status"] = status.toJson();
@@ -835,8 +835,8 @@ public:
 
     /*ARDUINO-JSON: Convert Class PINCONTROL to JSON
     ==================================================*/
-    DynamicJsonDocument toJson() override{
-        DynamicJsonDocument doc(1024);
+    JsonDocument toJson() override{
+        JsonDocument doc;
         doc["id"] = id();
         doc["model"] = model();     
         doc["state"] = _state;
@@ -880,8 +880,8 @@ public:
         
     /*ARDUINO-JSON: Convert Class Actuators to JSON
     ===================================================================*/
-    DynamicJsonDocument toJson() {
-        DynamicJsonDocument doc(2048);
+    JsonDocument toJson() {
+        JsonDocument doc;
         JsonObject obj = doc.to<JsonObject>();
         for (const auto& entry : _map) {
             for (Actuator* actuator : entry.second) {
@@ -989,9 +989,9 @@ public:
 
     /*ARDUINO-JSON: Convert Class Device to JSON
     ===============================================*/
-    DynamicJsonDocument toJson(){
-        DynamicJsonDocument doc(2048);
-        JsonObject obj = doc.createNestedObject("device");
+    JsonDocument toJson(){
+        JsonDocument doc;
+        JsonObject obj = doc["device"].to<JsonObject>();
         obj["sensors"] = sensors.toJson();
         obj["actuators"] = actuators.toJson();
         obj["id"] = _id;

@@ -25,11 +25,16 @@ include/secrets.h.example and fill in real values.*/
 #include "secrets.h"
 #include "ca_cert.h"
 #include "config-NT.h"
+#include "web-NT.h"
+
+#define FW_VERSION "6.0"
 #define MQTT_ID "Controller-iot"
 #define MQTT_TOPIC_SUB "/FAN/control"
 #define MQTT_TOPIC_PUB "/FAN/monitoring"
 
 ConfigStore configStore;   /*NVS-backed runtime config (item G)*/
+WebPortal webPortal;       /*config/status/OTA portal (item H)*/
+bool apRescueMode = false; /*true: WiFi assoc failed, AP FanController-Setup up*/
 const char* ssid;          /*bound to configStore.cfg after load()*/
 const char* password;  
 String ip;
@@ -152,6 +157,17 @@ void setup(){
       String welcome = "Hello I am " + mqtt_ID;
       mqtt.client.publish(mqtt_topic_pub,welcome.c_str());
     }
+  }
+  else{
+    /*Item H: AP rescue mode. WiFi association failed (wrong credentials,
+    network down): raise our own AP so the portal stays reachable at
+    http://192.168.4.1 and the device can be reconfigured without a
+    reflash. Thermal control keeps running regardless.*/
+    apRescueMode = true;
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP("FanController-Setup", configStore.cfg.webPass);
+    Serial.printf("\nAP RESCUE MODE: SSID FanController-Setup, http://%s/\n",
+                  WiFi.softAPIP().toString().c_str());
   } 
 
   doorOpenAlarm.writePin(doorOpenMon.readPin());
@@ -202,6 +218,26 @@ void setup(){
   stateMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(controlTask, "control", 4096, NULL, 2,
                           &controlTaskHandle, 1);
+
+  /*Item H: web portal (station or AP-rescue mode). Status callback
+  copies live values under the state mutex.*/
+  webPortal.begin(configStore, [](JsonDocument& doc){
+    if(xSemaphoreTake(stateMutex, pdMS_TO_TICKS(500)) == pdTRUE){
+      doc["temp"]      = temp1.readTemperature();
+      doc["pwm1"]      = fan1.value();
+      doc["pwm2"]      = fan2.value();
+      doc["door"]      = (bool)doorOpenMon.readPin();
+      doc["tempAlarm"] = (bool)temp1.alm();
+      doc["fanAlarm"]  = (bool)fanAlarm.status.alm();
+      xSemaphoreGive(stateMutex);
+    }
+    doc["rssi"]    = WiFi.RSSI();
+    uint32_t up = millis()/1000;
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%lud %02lu:%02lu", up/86400, (up/3600)%24, (up/60)%60);
+    doc["uptime"]  = buf;
+    doc["version"] = FW_VERSION;
+  }, "fan-controller");
 
   last_time = millis();
   //last_wifi_event_time = millis();  //Last wifi event time
@@ -353,7 +389,10 @@ void controlTask(void*){
 
 void loop() {
   esp_task_wdt_reset();
+  webPortal.handle();
   current_time = millis();
+  if (apRescueMode)   /*no STA reconnection fight while the rescue AP is up*/
+    return;
   if (millis() - last_time > delayTime){
     last_time = current_time;
     /*Snapshot under mutex, network OUTSIDE it: a slow TLS handshake

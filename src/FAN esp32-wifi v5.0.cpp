@@ -17,19 +17,17 @@ u_int8_t pwm_resolution = 10;
 u_int8_t pwm_channel0 = 0, pwm_channel1 = 1;
 int pwm_freq = 10000;
 
-/*WIFI AND MQTT INFORMATION*/
+/*WIFI AND MQTT INFORMATION
+Credentials live in include/secrets.h (gitignored). Copy
+include/secrets.h.example and fill in real values.*/
 /*========================================================*/
-//#define MQTT_SERVER "mosquitto.network-telemetrix.com"
-#define MQTT_SERVER "mosquitto.network-telemetrix.com"
-#define MQTT_PORT 8883
-#define MQTT_CLIENT_USER "Claro-IoT"
-#define MQTT_CLIENT_PASS "Claro.2023"
+#include "secrets.h"
 #define MQTT_ID "Controller-iot"
 #define MQTT_TOPIC_SUB "/FAN/control"
 #define MQTT_TOPIC_PUB "/FAN/monitoring"
 
-const char* ssid = "Claro-IoT";
-const char* password = "Claro.2023";  
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASSWORD;  
 String ip;
 const char* ntpServer = "pool.ntp.org";
 WiFiUDP ntpUDP;

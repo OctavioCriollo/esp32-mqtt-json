@@ -31,6 +31,7 @@ include/secrets.h.example and fill in real values.*/
 #define MQTT_ID "Controller-iot"
 #define MQTT_TOPIC_SUB "/FAN/control"
 #define MQTT_TOPIC_PUB "/FAN/monitoring"
+#define MQTT_RETRY_MS 15000   /*min gap between MQTT/TLS reconnect attempts*/
 
 ConfigStore configStore;   /*NVS-backed runtime config (item G)*/
 WebPortal webPortal;       /*config/status/OTA portal (item H)*/
@@ -412,11 +413,20 @@ void loop() {
       #else
       WIFIClient.setCACert(CA_CERT);
       #endif
-      if(mqtt.checkConnection(1)){
-        if(haveSnapshot) mqtt.publish(true,snapshot);
+      /*Reconnect backoff: with the broker down, a TLS handshake every
+      second churns ~40 KB of heap per attempt and blocks this task for
+      seconds, starving AsyncTCP. Retry at most every MQTT_RETRY_MS; an
+      established session is never throttled.*/
+      static ulong lastMqttAttempt = 0;
+      bool mqttReady = mqtt.client.connected();
+      if(!mqttReady && millis() - lastMqttAttempt >= MQTT_RETRY_MS){
+        lastMqttAttempt = millis();
+        mqttReady = mqtt.connect(1);
       }
+      if(mqttReady && haveSnapshot)
+        mqtt.publish(true,snapshot);
       if(!WIFIClient.connected())
-        Serial.printf("\nFAILURE Conection to %s",mqtt.server());    
+        Serial.printf("\nFAILURE Conection to %s",mqtt.server());
     }
     /*================================================================*/
     mqtt.client.loop();  

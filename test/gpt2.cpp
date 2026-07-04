@@ -3,15 +3,15 @@
 #include <ArduinoJson.h>
 
 // Datos de la red WiFi
-const char* ssid = "nombre_de_la_red_wifi";
-const char* password = "contraseña_de_la_red_wifi";
+const char* ssid = "SSID_WIFI";
+const char* password = "PASSWORD_WIFI";
 
 // Datos del broker MQTT
-const char* mqtt_server = "mosquitto.network-telemetrix.com";
+const char* mqtt_server = "MQTT_SERVER_CONFIG";
 const int mqtt_port = 8883;
-const char* mqtt_user = "usuario_del_broker_mqtt";
-const char* mqtt_password = "contraseña_del_broker_mqtt";
-const char* mqtt_topic = "topic_para_los_datos";
+const char* mqtt_user = "MQTT_USER";
+const char* mqtt_password = "MQTT_PASSWORD";
+const char* mqtt_topic = "MQTT_TOPIC";
 
 // Objeto de la clase WiFiClient
 WiFiClient wifiClient;

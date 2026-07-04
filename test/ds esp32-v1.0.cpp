@@ -34,13 +34,13 @@
 #define DOOR_OPEN_PIN_MONITORING GPIO_NUM_32
 #define DS_PIN_MONITORING GPIO_NUM_27  //For DS18B20 Temperature Sensor 1-WIRE
 
-const char* ssid = "Wifi Octavio Indoor 2G";   //Ingresa el nombre de tu red WiFi
-const char* password = "199905498";  //Ingresa la contraseña de tu red WiFi
-const char* mqtt_server = "mosquitto.network-telemetrix.com/mqtt";
-const char* mqtt_ID = "Home_Octavio";
-const char* mqtt_user = "NT";
-const char* mqtt_password = "199905498";
-const char* mqtt_topic_temp = "valencia/octavio/home/temp";
+const char* ssid = "SSID_WIFI";   //Ingresa el nombre de tu red WiFi
+const char* password = "PASSWORD_WIFI";  //Ingresa la contraseña de tu red WiFi
+const char* mqtt_server = "MQTT_SERVER_CONFIG";
+const char* mqtt_ID = "MQTT_CLIENT_ID";
+const char* mqtt_user = "MQTT_USER";
+const char* mqtt_password = "MQTT_PASSWORD";
+const char* mqtt_topic_temp = "MQTT_TOPIC";
 
 WiFiClient WIFI_CLIENT;
 PubSubClient MQTT_CLIENT(WIFI_CLIENT);

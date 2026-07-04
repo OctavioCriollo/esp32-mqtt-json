@@ -60,20 +60,20 @@ DeviceAddress Addr_DS_sensor;
 
 /*Datos de la red Wifi:
 ======================================================================================*/
-const char* ssid = "Infinix Octavio";            //Ingresa el nombre de tu red WiFi*/
-//const char* ssid = "Wifi Octavio Indoor 2G";   //Ingresa el nombre de tu red WiFi
-const char* password = "199905498";              //Ingresa la contraseña de tu red WiFi
+const char* ssid = "SSID_WIFI";            //Ingresa el nombre de tu red WiFi*/
+//const char* ssid = "SSID_WIFI";   //Ingresa el nombre de tu red WiFi
+const char* password = "PASSWORD_WIFI";              //Ingresa la contraseña de tu red WiFi
 
 /*Datos del Broker MQTT:
 =================================================================*/
-const char* mqtt_server = "192.168.0.105";
-//const char* mqtt_server = "mosquitto.network-telemetrix.com";
+const char* mqtt_server = "MQTT_SERVER_CONFIG";
+//const char* mqtt_server = "MQTT_SERVER_CONFIG";
 const int mqtt_port = 1883;
-const char* mqtt_Client_ID = "ESP_0919452490_Biodigestor";
-const char* mqtt_user = "NT";
-const char* mqtt_password = "199905498";
-const char* mqtt_topic_sub = "Data_Sensor/Valencia/0919452490";
-const char* mqtt_topic_pub = "Data_Sensor/Valencia/0919452490";
+const char* mqtt_Client_ID = "MQTT_CLIENT_ID";
+const char* mqtt_user = "MQTT_USER";
+const char* mqtt_password = "MQTT_PASSWORD";
+const char* mqtt_topic_sub = "MQTT_TOPIC";
+const char* mqtt_topic_pub = "MQTT_TOPIC";
 
 WiFiClient Wifi_ESP_client;   //Objeto class WiFiClient
 PubSubClient mqtt_ESP_client(Wifi_ESP_client);    //Objeto Class PubSubClient

@@ -13,17 +13,17 @@ Copyright (c) 2023 Octavio Criollo.
 
 /*WIFI AND MQTT INFORMATION*/
 /*========================================================*/
-#define MQTT_SERVER "mosquitto.network-telemetrix.com"
+#define MQTT_SERVER "MQTT_SERVER_CONFIG"
 #define MQTT_PORT 8883
-#define MQTT_CLIENT_USER "Claro-IoT"
-#define MQTT_CLIENT_PASS "Claro.2023"
-#define MQTT_ID "ESP32-Claro"
-#define MQTT_TOPIC_SUB "/claro/control"
-#define MQTT_TOPIC_PUB "/claro/monitoring"
-const char* ssid = "Claro-Ecuador";
-const char* password = "Claro.2023";
-//const char* ssid = "Wifi Octavio Indoor 2G";    
-//const char* password = "199905498";  
+#define MQTT_CLIENT_USER "MQTT_USER"
+#define MQTT_CLIENT_PASS "MQTT_PASSWORD"
+#define MQTT_ID "MQTT_CLIENT_ID"
+#define MQTT_TOPIC_SUB "MQTT_TOPIC"
+#define MQTT_TOPIC_PUB "MQTT_TOPIC"
+const char* ssid = "SSID_WIFI";
+const char* password = "PASSWORD_WIFI";
+//const char* ssid = "SSID_WIFI";
+//const char* password = "PASSWORD_WIFI";
 /*========================================================*/
 
 const char* mqtt_server = MQTT_SERVER;

@@ -25,7 +25,6 @@ bool wifi_connect(const char* ssid, const char* password, int waitConnect){
     IPAddress ip = WiFi.localIP();
     Serial.println(" SUSSCEFUL!!!");
     Serial.printf("* SSID: %s\n",ssid);
-    Serial.printf("* Pass: %s\n",password);
     Serial.printf("* IP:   %s\n",ip.toString().c_str());
     return true;
 }

@@ -5,7 +5,13 @@
 bool wifi_connect(const char* ssid, const char* password, int waitConnect){
     delay(200);
     Serial.print("\nConnecting to WiFi");
+    WiFi.mode(WIFI_STA);
     WiFi.begin(ssid,password);
+    /*STA defaults to modem power save (WIFI_PS_MIN_MODEM): the radio naps
+    between beacons and inbound TCP to the async portal stalls or drops.
+    The AP never sleeps, which is why the portal only felt broken in STA.
+    Applied here (not in setup) so every reconnect re-asserts it.*/
+    WiFi.setSleep(false);
     for (int i=1; i<=waitConnect; i++){
         if (WiFi.status() == WL_CONNECTED)
             break;

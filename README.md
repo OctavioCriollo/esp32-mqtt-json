@@ -6,6 +6,25 @@ This project uses an ESP32 to control fans based on the temperature measured by 
 
 ![System Diagram](images/fan-controller-power-plant.png)
 
+## v6.0 Modernization (July 2026)
+
+The firmware was modernized end to end. Highlights:
+
+- **Platform:** [pioarduino](https://github.com/pioarduino/platform-espressif32) (Arduino core 3.x / ESP-IDF 5.x) — the espressif32 PlatformIO platform is frozen upstream.
+- **Security:** credentials moved out of source into `include/secrets.h` (gitignored; copy `include/secrets.h.example`). Real TLS validation of the MQTT broker against ISRG Root X1 (`include/ca_cert.h`).
+- **Robustness:** fan control runs in a dedicated FreeRTOS task decoupled from networking — WiFi/MQTT outages can no longer stall thermal regulation. Hardware watchdog (30 s). Degraded boot: a failed DS18B20 no longer hangs the device (fans failsafe to 100%, alarm reported over MQTT).
+- **Web portal:** `http://fan-controller.local` — live status, runtime configuration (WiFi/MQTT credentials, temperature thresholds; stored in NVS, no recompile needed) and **browser OTA** firmware updates. HTTP Basic auth (`admin` / configurable password).
+- **AP rescue mode:** if WiFi association fails at boot, the device raises the `FanController-Setup` access point with the portal at `192.168.4.1`.
+- **CI/CD:** every push compiles the firmware on GitHub Actions; pushing a `v*` tag publishes a GitHub Release with the versioned `.bin` (flash it via the OTA page).
+
+### Quickstart
+
+```bash
+cp include/secrets.h.example include/secrets.h   # fill in your values
+pio run -t upload                                # first flash over USB
+# subsequent updates: portal -> Firmware OTA -> upload the CI-built .bin
+```
+
 ## Features
 - WiFi connection.
 - MQTT connection and communication.
@@ -23,9 +42,10 @@ This project uses an ESP32 to control fans based on the temperature measured by 
 
 ## Required Libraries
 To use this code, you need to install the following libraries:
-- `ArduinoJson` for JSON serialization and deserialization.
-- `PubSubClient` for MQTT communication.
-- `SPIFFS` for SPI Flash File System.
+- `ArduinoJson` (v7) for JSON serialization and deserialization.
+- `PubSubClient` for MQTT communication (TLS via `WiFiClientSecure` + CA validation).
+- `ESPAsyncWebServer` + `AsyncTCP` (ESP32Async forks) for the web portal.
+- `Preferences` (NVS) for persistent runtime configuration.
 - Library files for specific sensors and actuators used in your project, such as:
   - `sensor-NT-02.h` for the temperature sensor.
   - `wireless-NT.h` for WiFi connection.

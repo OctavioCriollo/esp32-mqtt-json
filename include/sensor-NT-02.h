@@ -278,6 +278,12 @@ public:
 
     /*METHOD Class DS18B20
     ==================================================*/
+    /*Last temperature already read by the control task. Web/status paths
+    must use this instead of readTemperature(): a OneWire conversion takes
+    ~190 ms and would block the async_tcp task on every portal poll.*/
+    float temperature() const{
+        return _temperature;
+    }
     float readTemperature() {
         sensor.requestTemperaturesByAddress(_addr);
         if(!sensor.isConnected(_addr)){

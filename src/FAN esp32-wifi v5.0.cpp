@@ -223,7 +223,7 @@ void setup(){
   copies live values under the state mutex.*/
   webPortal.begin(configStore, [](JsonDocument& doc){
     if(xSemaphoreTake(stateMutex, pdMS_TO_TICKS(500)) == pdTRUE){
-      doc["temp"]      = temp1.readTemperature();
+      doc["temp"]      = temp1.temperature();   /*cached: no OneWire here*/
       doc["pwm1"]      = fan1.value();
       doc["pwm2"]      = fan2.value();
       doc["door"]      = (bool)doorOpenMon.readPin();

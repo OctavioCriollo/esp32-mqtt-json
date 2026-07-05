@@ -32,6 +32,8 @@ include/secrets.h.example and fill in real values.*/
 #define MQTT_TOPIC_SUB "/FAN/control"
 #define MQTT_TOPIC_PUB "/FAN/monitoring"
 #define MQTT_RETRY_MS 15000   /*min gap between MQTT/TLS reconnect attempts*/
+#define WIFI_BOOT_ATTEMPTS 10 /*~10 s STA association window at boot (was 5)*/
+#define AP_RESCUE_RETRY_MS 180000 /*retry STA every 3 min while in AP rescue*/
 
 ConfigStore configStore;   /*NVS-backed runtime config (item G)*/
 WebPortal webPortal;       /*config/status/OTA portal (item H)*/
@@ -146,7 +148,7 @@ void setup(){
   mqtt_ID += " (" + String(WiFi.macAddress()) + ")";
   mqtt.setId(mqtt_ID.c_str());
 
-  if(wifi_connect(ssid,password,5)){
+  if(wifi_connect(ssid,password,WIFI_BOOT_ATTEMPTS)){
     #ifdef MQTT_TLS_INSECURE
     WIFIClient.setInsecure();   /*Diagnostics only: no certificate validation*/
     #else
@@ -165,7 +167,11 @@ void setup(){
     http://192.168.4.1 and the device can be reconfigured without a
     reflash. Thermal control keeps running regardless.*/
     apRescueMode = true;
-    WiFi.mode(WIFI_AP);
+    /*AP_STA (not AP): the rescue portal stays reachable while the station
+    interface keeps retrying the configured network in the background, so
+    a router that comes up late (e.g. after a power cut) reconnects us
+    automatically instead of stranding the device on its own AP forever.*/
+    WiFi.mode(WIFI_AP_STA);
     WiFi.softAP("FanController-Setup", configStore.cfg.webPass);
     Serial.printf("\nAP RESCUE MODE: SSID FanController-Setup, http://%s/\n",
                   WiFi.softAPIP().toString().c_str());
@@ -397,8 +403,27 @@ void loop() {
   esp_task_wdt_reset();
   webPortal.handle();
   current_time = millis();
-  if (apRescueMode)   /*no STA reconnection fight while the rescue AP is up*/
-    return;
+  if (apRescueMode){
+    /*Non-blocking STA recovery (item A3): kick a fresh association every
+    AP_RESCUE_RETRY_MS and poll status each loop. On success drop the AP,
+    switch to STA-only and resume normal networking; the rescue portal is
+    served the whole time via WIFI_AP_STA.*/
+    if (WiFi.status() == WL_CONNECTED){
+      Serial.printf("\nSTA link recovered, leaving AP rescue: http://%s/\n",
+                    WiFi.localIP().toString().c_str());
+      WiFi.softAPdisconnect(true);
+      WiFi.mode(WIFI_STA);
+      WiFi.setSleep(false);
+      apRescueMode = false;
+    }else{
+      static ulong lastStaRetry = 0;
+      if (millis() - lastStaRetry >= AP_RESCUE_RETRY_MS){
+        lastStaRetry = millis();
+        WiFi.begin(ssid, password);   /*async; result checked next cycles*/
+      }
+      return;   /*stay in rescue; portal keeps serving*/
+    }
+  }
   if (millis() - last_time > delayTime){
     last_time = current_time;
     /*Snapshot under mutex, network OUTSIDE it: a slow TLS handshake

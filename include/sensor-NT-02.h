@@ -146,9 +146,9 @@ public:
     status() {}
     
     virtual ~Sensor() {
-        if (_label != nullptr)  delete[] _label;
+        if (_label != nullptr)  free((void*)_label);   /*strdup() -> free()*/
         if (_topic != nullptr)  free((void*)_topic);   /*strdup() -> free()*/
-        if (_model != nullptr)  delete[] _model;
+        if (_model != nullptr)  free((void*)_model);   /*strdup() -> free()*/
     };   /*Destructor*/
 
     /*GETTER atributos Class Sensor
@@ -172,7 +172,7 @@ public:
     /*SETTER atributos Class Sensor
     ========================================*/ 
     void setlabel(const char* label){
-        if(_label != nullptr)   delete[] _label;
+        if(_label != nullptr)   free((void*)_label);   /*strdup() -> free()*/
         _label = strdup(label);
     }
     void setTopic(const char* topic){
@@ -187,7 +187,7 @@ public:
         _timestamp = timestamp;
     }
     void setModel(const char* model){
-        if(_label != nullptr)   delete[] _label;
+        if(_model != nullptr)   free((void*)_model);   /*was freeing _label; strdup() -> free()*/
         _model = strdup(model);
     }
     
@@ -262,7 +262,7 @@ public:
     /*SETTER atributos Class DS18B20
     ===========================================*/
     void setCode(const char* code){
-        if(_code != nullptr)    delete[] _code;
+        if(_code != nullptr)    free((void*)_code);   /*strdup() -> free()*/
         _code = strdup(code);
     }
     void setAlm(boolean alm){
@@ -686,9 +686,9 @@ public:
     status() {}
     
     virtual ~Actuator() {
-        if(_label != nullptr)   delete[] _label;
-        if(_model != nullptr)   delete[] _model;
-        if(_topic != nullptr)   delete[] _topic;
+        if(_label != nullptr)   free((void*)_label);   /*strdup() -> free()*/
+        if(_model != nullptr)   free((void*)_model);   /*strdup() -> free()*/
+        if(_topic != nullptr)   free((void*)_topic);   /*strdup() -> free()*/
     };   /*Destructor*/
 
     /*GETTER atributos Class Actuator
@@ -712,11 +712,11 @@ public:
     /*SETTER atributos Class Actuator
     ========================================*/ 
     void setlabel(const char* label){
-        if(_label != nullptr)   delete[] _label;
+        if(_label != nullptr)   free((void*)_label);   /*strdup() -> free()*/
         _label = strdup(label);
     }
     void setTopic(const char* topic){
-        if(_topic != nullptr)   delete[] _topic;
+        if(_topic != nullptr)   free((void*)_topic);   /*strdup() -> free()*/
         _topic = strdup(topic);
     }
     void setID(const char* id){
@@ -726,7 +726,7 @@ public:
         _timestamp = timestamp;
     }
     void setModel(const char* model){
-        if(_model != nullptr)   delete[] _model;
+        if(_model != nullptr)   free((void*)_model);   /*strdup() -> free()*/
         _model = strdup(model);
     }
     
@@ -972,26 +972,26 @@ public:
         _id = id;
     }
     void setLabel(const char* label){
-        if(_label!= nullptr)    delete[] _label;
+        if(_label!= nullptr)    free((void*)_label);   /*strdup() -> free()*/
         _label = strdup(label);
     }
     void setPlatform(const char* platform){
         _platform = platform;
     }
     void setMAC(const char* MAC){
-        if(_MAC != nullptr) delete[] _MAC;
+        if(_MAC != nullptr) free((void*)_MAC);   /*strdup() -> free()*/
         _MAC = strdup(MAC);
     }
     void setIP(const char* IP){
-        if(_IP != nullptr) delete[] _IP;
+        if(_IP != nullptr) free((void*)_IP);   /*strdup() -> free()*/
         _IP = strdup(IP);
     }
     void setCommunication(const char* communication){
-        if(_communication != nullptr) delete[] _communication;
+        if(_communication != nullptr) free((void*)_communication);   /*strdup() -> free()*/
         _communication = strdup(communication);
     }
     void setWorkingMode(const char* workingMode){
-        if(_workingMode != nullptr) delete[] _workingMode;
+        if(_workingMode != nullptr) free((void*)_workingMode);   /*strdup() -> free()*/
         _workingMode = strdup(workingMode);
     }
     void setTopic(const char* topic){

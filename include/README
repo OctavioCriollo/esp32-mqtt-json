@@ -2,7 +2,6 @@
 Este directorio contiene los siguientes archivos:
 - IoT-NT.h
 - mqtt-NT.h
-- sensor-NT-01.h
 - sensor-NT-02.h
 
 Archivo IoT-NT.h

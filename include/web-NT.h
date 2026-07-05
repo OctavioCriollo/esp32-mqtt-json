@@ -120,7 +120,11 @@ public:
         _store = &store;
         _fillStatus = fillStatus;
 
+        /*Auth required: the portal page embeds the current SSID, MQTT
+        server and MQTT user, so an open "/" leaked config to anyone on
+        the LAN (or on the rescue AP).*/
         _server.on("/", HTTP_GET, [this](AsyncWebServerRequest* req){
+            if (!_auth(req)) return;
             req->send(200, "text/html", _renderPortal());
         });
 

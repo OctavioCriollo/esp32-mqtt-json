@@ -81,20 +81,28 @@ public:
         client.setBufferSize(_bufferSize);
     }
     
-    bool publish(bool event, JsonDocument doc){
+    bool publish(bool event, const JsonDocument& doc){   /*by ref: no full-doc copy per publish*/
         if(!event)
             return false;
+        size_t needed = measureJson(doc);
+        if(needed >= _bufferSize){
+            /*Would overflow the MQTT buffer and be silently truncated to
+            invalid JSON. Fail loudly instead of publishing garbage.*/
+            Serial.printf("\nMQTT publish skipped: payload %u > buffer %u\n",
+                          (unsigned)needed, (unsigned)_bufferSize);
+            return false;
+        }
         std::vector<char> buffer(_bufferSize);   /*heap, not a 2KB stack VLA*/
         size_t n = serializeJson(doc,buffer.data(),buffer.size());
-        client.publish(_topicPUB,(const uint8_t*)buffer.data(),n,false);
+        bool ok = client.publish(_topicPUB,(const uint8_t*)buffer.data(),n,false);
 
-        Serial.printf("\nSENT MESSAGE:");
+        Serial.printf("\nSENT MESSAGE (%s):", ok ? "ok" : "FAILED");
         Serial.printf("\nBROKER: %s",_server);
         Serial.printf("\nTOPIC: %s\n",_topicPUB);
         serializeJson(doc,Serial);
         Serial.println();
 
-        return true;
+        return ok;
     }
     void subscribe(){
         client.subscribe(_topicSUB);

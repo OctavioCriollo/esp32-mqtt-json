@@ -138,6 +138,17 @@ public:
 
         _server.on("/api/config", HTTP_POST, [this](AsyncWebServerRequest* req){
             if (!_auth(req)) return;
+            /*softAP() needs an 8..63 char key or the rescue AP silently
+            comes up open (or fails). Reject a weak new webPass before it
+            is ever persisted; empty means "keep current".*/
+            if (req->hasParam("webPass", true)){
+                String wp = req->getParam("webPass", true)->value();
+                if (wp.length() != 0 && (wp.length() < 8 || wp.length() > 63)){
+                    req->send(400, "text/plain",
+                              "Password del portal invalido: use 8 a 63 caracteres");
+                    return;
+                }
+            }
             AppConfig& c = _store->cfg;
             _copyParam(req, "wifiSsid",   c.wifiSsid,   sizeof(c.wifiSsid),   false);
             _copyParam(req, "wifiPass",   c.wifiPass,   sizeof(c.wifiPass),   true);

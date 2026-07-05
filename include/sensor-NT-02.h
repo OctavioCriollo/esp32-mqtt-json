@@ -222,7 +222,7 @@ public:
     DS18B20(u_int8_t pin, const char* id): 
     Sensor(id), _pin(pin),
     _resolution(DEFAULT_RESOLUTION), _communication(ONE_WIRE), _workingMode(SLAVE),   
-    _oneWire(pin), sensor(&_oneWire), _alm(NOT_ALARM),
+    _oneWire(pin), sensor(&_oneWire), _temperature(NAN), _alm(NOT_ALARM),
     _code(nullptr)
     {   
         String str = "/ds18b20/" + String(id);
@@ -283,16 +283,29 @@ public:
     float temperature() const{
         return _temperature;
     }
+    /*Returns a validated temperature, or NAN when this cycle's reading is
+    not trustworthy. On a bad read _temperature (last good value) is kept
+    for display; callers driving actuators must treat NAN as failsafe.*/
     float readTemperature() {
         sensor.requestTemperaturesByAddress(_addr);
         if(!sensor.isConnected(_addr)){
             status.setAlm(ALARM);
             status.setCode(DISCONNECTED);
-        }else{
-            _temperature = sensor.getTempC(_addr);
-            status.setAlm(NOT_ALARM);
-            status.setCode(OK);
+            return NAN;
         }
+        float t = sensor.getTempC(_addr);
+        /*Reject the -127 disconnect sentinel and physically impossible
+        values (DS18B20 range is -55..125 C). A transient CRC error can
+        return -127 while isConnected() still reports true; trusting it
+        would coast the fans down on a hot cabinet.*/
+        if(isnan(t) || t <= DEVICE_DISCONNECTED_C || t < -55.0f || t > 125.0f){
+            status.setAlm(ALARM);
+            status.setCode(DISCONNECTED);
+            return NAN;
+        }
+        _temperature = t;
+        status.setAlm(NOT_ALARM);
+        status.setCode(OK);
         return _temperature;
     }
     bool isConnected() {

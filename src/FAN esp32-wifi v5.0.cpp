@@ -271,7 +271,12 @@ float tempCabinet = temp1.readTemperature();
 
 /*PROCESSING PARAMETERS
 ======================================================*/
-if(temp1.isConnected()){
+/*Failsafe (item E/A4): readTemperature() returns NAN for a missing
+sensor OR an invalid reading (e.g. the DS18B20 -127 disconnect sentinel).
+Either way the fans go to full and the alarm fires; a garbage low value
+must never be allowed to coast the fans down. This also avoids a second
+OneWire round-trip that the old isConnected() guard incurred.*/
+if(!isnan(tempCabinet)){
   if(tempCabinet > HIGH_T){
     fan1.write(PWM_MAX);
     fan2.write(PWM_MAX);

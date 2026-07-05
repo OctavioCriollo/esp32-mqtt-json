@@ -9,7 +9,7 @@ Copyright (c) 2023 Octavio Criollo.
 #include "wireless-NT.h"
 #include "mqtt-NT.h"
 #include "IoT-NT.h"
-#include <arduino-timer.h>
+//#include <arduino-timer.h>   /*parked: Timer is only used by the (parked) tachometer code*/
 #include <esp_task_wdt.h>
 
 /*PWM variables
@@ -298,7 +298,6 @@ if(!isnan(tempCabinet)){
   }
   if(tempCabinet >= (LOW_T - n/(1-n)*(HIGH_T-LOW_T)) and tempCabinet <= HIGH_T){
     temp1.setAlm(tempCabinet > (HIGH_T - TEMP_HISTERESIS) and temp1.alm());
-    //pwm = 100.00/(float)(HIGH_T-LOW_T)*(tempCabinet-(float)LOW_T); //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
     pwm = PWM_MAX*(1-n)/(HIGH_T-LOW_T)*(tempCabinet-LOW_T) + n*PWM_MAX; //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
     pwm = round(pwm*100)/100;
     fan1.write(pwm);
@@ -380,11 +379,6 @@ Serial.print("\nFAN2 status: ");  Serial.print(fan2.status.code());
 //Serial.print("\nFAN2 RPM: "); Serial.print(tachMon2.rpm()); Serial.print(" rpm");    
 Serial.print("\nFAN2 PWM (%): "); Serial.print(fan2.value()); Serial.print("%");
 Serial.println();
-/*
-Serial.println("\n");
-serializeJson(controller.toJson(),Serial);
-Serial.println("\n");
-*/
 }
 
 void controlTask(void*){

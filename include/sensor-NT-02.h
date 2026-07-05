@@ -628,20 +628,6 @@ public:
     ========================================*/ 
     Sensors() {} 
 
-    /*GETTER atributos Class Sensors
-    ========================================*/ 
-    /*Obtener un sensor por ID*/
-    Sensor get(const char* id){
-        for(const auto& entry: _map){
-            for (Sensor* sensor: entry.second) {
-                if (sensor->id() == id) {
-                    return *sensor;
-                }
-            }
-        }
-        throw std::runtime_error("Sensor not found");
-    }
-
     /*SETTER atributos Class Sensors
     ========================================*/
     /*Agregar un sensor ya creado al objeto Sensors*/
@@ -871,20 +857,6 @@ public:
     ========================================*/ 
     Actuators() {} 
 
-    /*GETTER atributos Class Actuators
-    ========================================*/ 
-    /*Obtener un actuator por ID*/
-    Actuator get(const char* id) {
-        for(const auto& entry: _map){
-            for (Actuator* actuator: entry.second) {
-                if (actuator->id() == id) {
-                        return *actuator;
-                }
-            }
-        }
-        throw std::runtime_error("Actuator not found");
-    }
-
     /*SETTER atributos Class Actuators
     ========================================*/
     /*Agregar un actuator ya creado al objeto Actuators*/
@@ -933,8 +905,10 @@ public:
     _IP(nullptr),
     _communication(nullptr),
     _workingMode(nullptr),
-    _timestamp(DEFAULT_TIMESTAMP), 
-    status(), sensors(sensors), actuators(actuators) {} 
+    _timestamp(DEFAULT_TIMESTAMP),
+    /*sensors/actuators are default-constructed; the old init list read
+    them from themselves before construction (undefined behavior).*/
+    status() {}
 
     /*GETTER atributos privados Class Device
     ========================================*/

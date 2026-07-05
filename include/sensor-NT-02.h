@@ -577,7 +577,7 @@ public:
         _lastTime = millis();
     }
     void count(){
-        _pulses++;           
+        _pulses = _pulses + 1;   /*volatile ++ is deprecated since C++20*/
     }
     void setRPM(unsigned long timing){
         _rpm = (_pulses*60000.0)/(_pulseByCycle*timing);

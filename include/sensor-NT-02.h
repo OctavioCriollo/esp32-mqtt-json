@@ -210,7 +210,6 @@ private:
     OneWire _oneWire;
     DeviceAddress _addr;    /*ROM Code 64 bits or 8 Bytes*/
     DallasTemperature sensor;
-    JsonArray _address;
     float _temperature;
     float _upper;
     float _lower;
@@ -318,17 +317,7 @@ public:
         addrStr.toUpperCase();
         return addrStr;
     }
-    const JsonArray& address() {
-        const size_t capacity = JSON_ARRAY_SIZE(sizeof(_addr));
-        JsonDocument doc;
-        JsonArray array = doc.to<JsonArray>();
-        for (size_t i=0;i<sizeof(_addr);i++){
-            array.add(_addr[i]);
-        }
-        _address = array;
-        return _address;
-    }
-    bool tryConnection() { 
+    bool tryConnection() {
         Serial.printf("\nConnecting to %s Sensor!!!",model());
         if(!isConnected()){
             Serial.printf("\n%s sensor no Found.",model());
@@ -355,8 +344,14 @@ public:
         doc["code"] = code();
         doc["workingMode"] = _workingMode;
         doc["communication"] = _communication;
-        doc["address"] = address();
-        doc["addrStr"] = addrStr();               
+        /*Build the ROM-address array in this document's pool. The old
+        address() helper filled a local JsonDocument and kept a JsonArray
+        reference to it after destruction: dangling memory in every
+        publish, plus the deprecated JSON_ARRAY_SIZE macro.*/
+        JsonArray addrArray = doc["address"].to<JsonArray>();
+        for (size_t i = 0; i < sizeof(_addr); i++)
+            addrArray.add(_addr[i]);
+        doc["addrStr"] = addrStr();
         //doc["label"] = label();                    
         doc["topic"] = topic();
         doc["timestamp"] = timestamp();

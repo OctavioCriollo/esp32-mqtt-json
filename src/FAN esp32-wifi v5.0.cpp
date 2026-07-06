@@ -27,9 +27,8 @@ include/secrets.h.example and fill in real values.*/
 #include "web-NT.h"
 
 #define FW_VERSION "6.0"
-#define MQTT_ID "Controller-iot"
-#define MQTT_TOPIC_SUB "/Claro/RBS/FAN/control"
-#define MQTT_TOPIC_PUB "/Claro/RBS/FAN/monitoring"
+/*MQTT client id and topics are built at boot from NVS config
+(operator/site/subsystem), so one firmware serves the whole fleet.*/
 #define MQTT_RETRY_MS 15000   /*min gap between MQTT/TLS reconnect attempts*/
 #define WIFI_BOOT_ATTEMPTS 10 /*~10 s STA association window at boot (was 5)*/
 #define AP_RESCUE_RETRY_MS 180000 /*retry STA every 3 min while in AP rescue*/
@@ -54,9 +53,9 @@ const char* mqtt_server;
 uint16_t mqtt_port;
 const char* mqtt_user;
 const char* mqtt_password;
-const char* mqtt_topic_pub = MQTT_TOPIC_PUB;
-const char* mqtt_topic_sub = MQTT_TOPIC_SUB;
-String mqtt_ID = MQTT_ID;
+String mqtt_topic_pub;   /*built from config in setup(): oper/site/subsys/telemetria*/
+String mqtt_topic_sub;   /*built from config in setup(): oper/site/subsys/control*/
+String mqtt_ID;          /*built from config in setup()*/
 
 WiFiClientSecure WIFIClient;
 MQTT mqtt(WIFIClient);
@@ -144,9 +143,17 @@ void setup(){
   mqtt.setPort(mqtt_port);
   mqtt.setUser(mqtt_user);
   mqtt.setPassword(mqtt_password);
-  mqtt.setTopicPUB(mqtt_topic_pub);
-  mqtt.setTopicSUB(mqtt_topic_sub);
-  mqtt_ID += " (" + String(WiFi.macAddress()) + ")";
+  /*Build the topic hierarchy and client id from per-site config:
+  operator/site/subsystem/{telemetria,control}. site is unique per board, so
+  the same firmware serves the whole fleet and enables wildcard ACLs.*/
+  String topicBase = String(configStore.cfg.mqttOperator) + "/" +
+                     configStore.cfg.mqttSite + "/" + configStore.cfg.mqttSubsystem;
+  mqtt_topic_pub = topicBase + "/telemetria";
+  mqtt_topic_sub = topicBase + "/control";
+  mqtt.setTopicPUB(mqtt_topic_pub.c_str());
+  mqtt.setTopicSUB(mqtt_topic_sub.c_str());
+  mqtt_ID = String(configStore.cfg.mqttSite) + "-" + configStore.cfg.mqttSubsystem +
+            " (" + WiFi.macAddress() + ")";
   mqtt.setId(mqtt_ID.c_str());
 
   if(wifi_connect(ssid,password,WIFI_BOOT_ATTEMPTS)){
@@ -168,7 +175,7 @@ void setup(){
       //mqtt.client.setCallback(callback);
       mqtt.subscribe();
       String welcome = "Hello I am " + mqtt_ID;
-      mqtt.client.publish(mqtt_topic_pub,welcome.c_str());
+      mqtt.client.publish(mqtt_topic_pub.c_str(),welcome.c_str());
     }
   }
   else{

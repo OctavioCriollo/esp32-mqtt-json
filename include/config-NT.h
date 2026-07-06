@@ -30,6 +30,7 @@ struct AppConfig {
     char webPass[33];
     float highTemp;   /*PWM = 100% at/above*/
     float lowTemp;    /*PWM = 0% at/below*/
+    float tzOffset;   /*UTC offset in hours for SNTP (e.g. -5.0 = Ecuador)*/
 };
 
 class ConfigStore {
@@ -55,9 +56,12 @@ public:
         _getStr("webPass",   cfg.webPass,   sizeof(cfg.webPass),   WEB_ADMIN_PASS);
         cfg.highTemp = _prefs.getFloat("highTemp", 43.0f);
         cfg.lowTemp  = _prefs.getFloat("lowTemp",  24.0f);
+        cfg.tzOffset = _prefs.getFloat("tzOffset", -5.0f);
         _prefs.end();
         /*Sanity: a broken saved range must never disable cooling.*/
         if (!(cfg.highTemp > cfg.lowTemp)) { cfg.highTemp = 43.0f; cfg.lowTemp = 24.0f; }
+        /*Sanity: keep the UTC offset within the real-world range.*/
+        if (!(cfg.tzOffset >= -12.0f && cfg.tzOffset <= 14.0f)) cfg.tzOffset = -5.0f;
     }
 
     bool save(){
@@ -71,6 +75,7 @@ public:
         _prefs.putString("webPass",   cfg.webPass);
         _prefs.putFloat("highTemp",   cfg.highTemp);
         _prefs.putFloat("lowTemp",    cfg.lowTemp);
+        _prefs.putFloat("tzOffset",   cfg.tzOffset);
         _prefs.end();
         return true;
     }

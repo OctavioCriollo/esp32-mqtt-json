@@ -52,6 +52,7 @@ small{color:#6b7280}</style></head><body>
 <label>MQTT Password</label><input name="mqttPass" type="password" placeholder="(sin cambio)">
 <label>Temp alta &deg;C (PWM 100%)</label><input name="highTemp" type="number" step="0.5" value="%HIGHTEMP%">
 <label>Temp baja &deg;C (PWM 0%)</label><input name="lowTemp" type="number" step="0.5" value="%LOWTEMP%">
+<label>Zona horaria (horas UTC, ej. -5)</label><input name="tzOffset" type="number" step="0.25" value="%TZOFFSET%">
 <label>Password del portal</label><input name="webPass" type="password" placeholder="(sin cambio)">
 <button type="submit">Guardar y reiniciar</button>
 <br><small>Usuario del portal: admin</small></form></div>
@@ -109,6 +110,7 @@ private:
         page.replace("%MQTTUSER%",   _store->cfg.mqttUser);
         page.replace("%HIGHTEMP%",   String(_store->cfg.highTemp, 1));
         page.replace("%LOWTEMP%",    String(_store->cfg.lowTemp, 1));
+        page.replace("%TZOFFSET%",   String(_store->cfg.tzOffset, 2));
         return page;
     }
 
@@ -162,6 +164,10 @@ public:
                 c.highTemp = req->getParam("highTemp", true)->value().toFloat();
             if (req->hasParam("lowTemp", true))
                 c.lowTemp = req->getParam("lowTemp", true)->value().toFloat();
+            if (req->hasParam("tzOffset", true)){
+                float tz = req->getParam("tzOffset", true)->value().toFloat();
+                if (tz >= -12.0f && tz <= 14.0f) c.tzOffset = tz;   /*ignore junk*/
+            }
             if (!(c.highTemp > c.lowTemp)) { c.highTemp = 43.0f; c.lowTemp = 24.0f; }
             bool ok = _store->save();
             req->send(ok ? 200 : 500, "text/plain",

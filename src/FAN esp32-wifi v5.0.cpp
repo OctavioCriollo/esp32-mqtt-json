@@ -33,10 +33,10 @@ include/secrets.h.example and fill in real values.*/
 #define MQTT_RETRY_MS 15000   /*min gap between MQTT/TLS reconnect attempts*/
 #define WIFI_BOOT_ATTEMPTS 10 /*~10 s STA association window at boot (was 5)*/
 #define AP_RESCUE_RETRY_MS 180000 /*retry STA every 3 min while in AP rescue*/
-/*SNTP time sync (real timestamps). Offset for Ecuador (UTC-5, no DST); a
-per-site value could later move to NVS config. Applied whenever WiFi comes
-up; nowIso8601() in the sensor library reads the synced clock.*/
-#define GMT_OFFSET_SEC     (-5*3600)
+/*SNTP time sync (real timestamps). The UTC offset is per-site and lives in
+NVS config (configStore.cfg.tzOffset, hours) editable from the portal.
+Applied whenever WiFi comes up; nowIso8601() in the sensor library reads
+the synced clock.*/
 #define DAYLIGHT_OFFSET_SEC 0
 #define NTP_SERVER         "pool.ntp.org"
 
@@ -155,7 +155,7 @@ void setup(){
     #else
     WIFIClient.setCACert(CA_CERT);
     #endif
-    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);  /*sync clock*/
+    configTime((long)(configStore.cfg.tzOffset*3600), DAYLIGHT_OFFSET_SEC, NTP_SERVER);  /*sync clock*/
     if(mqtt.connect(1)){
       //mqtt.client.setCallback(callback);
       mqtt.subscribe();
@@ -410,7 +410,7 @@ void loop() {
       WiFi.softAPdisconnect(true);
       WiFi.mode(WIFI_STA);
       WiFi.setSleep(false);
-      configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);  /*sync clock*/
+      configTime((long)(configStore.cfg.tzOffset*3600), DAYLIGHT_OFFSET_SEC, NTP_SERVER);  /*sync clock*/
       apRescueMode = false;
     }else{
       static ulong lastStaRetry = 0;

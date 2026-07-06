@@ -80,10 +80,10 @@ ulong current_time, last_time;
 /*event-driven networking globals removed; see docs/lab-01-roadmap.md*/
 
 DS18B20 temp1(ONE_WIRE_PIN,"temp1");
-PWM fan1(PWM_FAN_1,pwm_channel0,pwm_freq,pwm_resolution,"fan1");
-PWM fan2(PWM_FAN_2,pwm_channel1,pwm_freq,pwm_resolution,"fan2");
-//TACHOMETER tachMon1(TACH_FAN_1,INPUT_PULLUP,3,"tachMon1");
-//TACHOMETER tachMon2(TACH_FAN_2,INPUT_PULLUP,3,"tachMon2");  /*TACH_FAN_2: Cambiar GPIO0 a GPIO12*/
+PWM speedFan1(PWM_FAN_1,pwm_channel0,pwm_freq,pwm_resolution,"speedFan1");
+PWM speedFan2(PWM_FAN_2,pwm_channel1,pwm_freq,pwm_resolution,"speedFan2");
+//TACHOMETER fan1(TACH_FAN_1,INPUT_PULLUP,3,"fan1");
+//TACHOMETER fan2(TACH_FAN_2,INPUT_PULLUP,3,"fan2");  /*TACH_FAN_2: Cambiar GPIO0 a GPIO12*/
 PINSTATE doorOpenMon(IN_1,INPUT_PULLUP,"doorOpenMon");
 PINCONTROL doorOpenAlarm(RELAY_OUT_1,OUTPUT,"doorOpenAlarm");
 PINCONTROL fanAlarm(RELAY_OUT_2,OUTPUT,"fanAlarm");
@@ -101,8 +101,8 @@ void serial_setup(int bitRate){
 }
 /*
 bool timerCallback(void *){
-  tachMon1.setRPM(timing);
-  tachMon2.setRPM(timing);
+  fan1.setRPM(timing);
+  fan2.setRPM(timing);
   return true;
 }
 */
@@ -117,10 +117,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 /*
 void IRAM_ATTR isr1(){
-  tachMon1.count();
+  fan1.count();
 }
 void IRAM_ATTR isr2(){
-  tachMon2.count();
+  fan2.count();
 }
 */
 /*Item F globals: defined here so setup() can reference them; the task
@@ -199,8 +199,8 @@ void setup(){
   } 
 
   doorOpenAlarm.writePin(doorOpenMon.readPin());
-  fan1.write(PWM_MAX);
-  fan2.write(PWM_MAX);
+  speedFan1.write(PWM_MAX);
+  speedFan2.write(PWM_MAX);
   fanAlarm.on();
 
   /*Degraded boot (item E): a missing/broken DS18B20 must NOT hang the
@@ -221,10 +221,10 @@ void setup(){
 
   sensors.add(&temp1);
   sensors.add(&doorOpenMon);
-  //sensors.add(&tachMon1);
-  //sensors.add(&tachMon2);
-  actuators.add(&fan1);
-  actuators.add(&fan2);
+  //sensors.add(&fan1);
+  //sensors.add(&fan2);
+  actuators.add(&speedFan1);
+  actuators.add(&speedFan2);
   actuators.add(&doorOpenAlarm);
   actuators.add(&fanAlarm);
   controller.sensors = sensors;
@@ -252,8 +252,8 @@ void setup(){
   webPortal.begin(configStore, [](JsonDocument& doc){
     if(xSemaphoreTake(stateMutex, pdMS_TO_TICKS(500)) == pdTRUE){
       doc["temp"]      = temp1.temperature();   /*cached: no OneWire here*/
-      doc["pwm1"]      = fan1.value();
-      doc["pwm2"]      = fan2.value();
+      doc["pwm1"]      = speedFan1.value();
+      doc["pwm2"]      = speedFan2.value();
       doc["door"]      = (bool)doorOpenMon.readPin();
       doc["tempAlarm"] = (bool)temp1.status.alm();
       doc["fanAlarm"]  = (bool)fanAlarm.status.alm();
@@ -278,12 +278,12 @@ void setup(){
   //last_mqtt_event_time = millis();  //Last MQTT event time
   
   /*
-  tachMon1.enableISR(FALLING,isr1);
-  tachMon1.resetTime();
-  tachMon1.resetCount();
-  tachMon2.enableISR(FALLING,isr2);
-  tachMon2.resetTime();
-  tachMon2.resetTime();
+  fan1.enableISR(FALLING,isr1);
+  fan1.resetTime();
+  fan1.resetCount();
+  fan2.enableISR(FALLING,isr2);
+  fan2.resetTime();
+  fan2.resetTime();
   //timer.every(1000,timerCallback);
   */
 }
@@ -311,8 +311,8 @@ must never be allowed to coast the fans down. This also avoids a second
 OneWire round-trip that the old isConnected() guard incurred.*/
 if(!isnan(tempCabinet)){
   if(tempCabinet > HIGH_T){
-    fan1.write(PWM_MAX);
-    fan2.write(PWM_MAX);
+    speedFan1.write(PWM_MAX);
+    speedFan2.write(PWM_MAX);
     temp1.status.setAlm(ALARM);
     temp1.status.setCode("High Temperature");
   }
@@ -320,15 +320,15 @@ if(!isnan(tempCabinet)){
     temp1.status.setCode("Low Temperature");
   }
   if(tempCabinet < LOW_T - n/(1-n)*(HIGH_T-LOW_T)){
-    fan1.write(PWM_MIN);
-    fan2.write(PWM_MIN);
+    speedFan1.write(PWM_MIN);
+    speedFan2.write(PWM_MIN);
   }
   if(tempCabinet >= (LOW_T - n/(1-n)*(HIGH_T-LOW_T)) and tempCabinet <= HIGH_T){
     temp1.status.setAlm(tempCabinet > (HIGH_T - TEMP_HISTERESIS) and temp1.status.alm());
     pwm = PWM_MAX*(1-n)/(HIGH_T-LOW_T)*(tempCabinet-LOW_T) + n*PWM_MAX; //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
     pwm = round(pwm*100)/100;
-    fan1.write(pwm);
-    fan2.write(pwm);
+    speedFan1.write(pwm);
+    speedFan2.write(pwm);
     if(tempCabinet >= LOW_T and tempCabinet <= HIGH_T and !temp1.status.alm())
       temp1.status.setCode("Temperature OK"); 
     if (tempCabinet > (HIGH_T - TEMP_HISTERESIS) and tempCabinet <= HIGH_T and temp1.status.alm())
@@ -338,59 +338,59 @@ if(!isnan(tempCabinet)){
 else{
   temp1.status.setAlm(ALARM);
   temp1.status.setCode("Sensor Failure!");
-  fan1.write(PWM_MAX);
-  fan2.write(PWM_MAX);
+  speedFan1.write(PWM_MAX);
+  speedFan2.write(PWM_MAX);
 }
  
 if(doorCabinet == OPEN){
   doorOpenAlarm.status.setCode("Door is OPEN");
-  fan1.write(PWM_MIN);
-  fan2.write(PWM_MIN);
-  if(!fan1.status.alm())  fan1.status.setCode("FAN1 OFF");  
-  if(!fan2.status.alm())  fan2.status.setCode("FAN2 OFF");
+  speedFan1.write(PWM_MIN);
+  speedFan2.write(PWM_MIN);
+  if(!speedFan1.status.alm())  speedFan1.status.setCode("FAN1 OFF");  
+  if(!speedFan2.status.alm())  speedFan2.status.setCode("FAN2 OFF");
 }
 else{
   doorOpenAlarm.status.setCode("Door is CLOSE");
-  if(!fan1.status.alm() and tempCabinet > LOW_T*(1 + 0.06)) fan1.status.setCode("FAN1 ON");  /*check here*/
-  else if (tempCabinet < LOW_T)  fan1.status.setCode("FAN1 OFF");   
-  if(!fan2.status.alm() and tempCabinet > LOW_T*(1 + 0.06)) fan2.status.setCode("FAN2 ON");
-  else if (tempCabinet < LOW_T)  fan2.status.setCode("FAN2 OFF"); 
+  if(!speedFan1.status.alm() and tempCabinet > LOW_T*(1 + 0.06)) speedFan1.status.setCode("FAN1 ON");  /*check here*/
+  else if (tempCabinet < LOW_T)  speedFan1.status.setCode("FAN1 OFF");   
+  if(!speedFan2.status.alm() and tempCabinet > LOW_T*(1 + 0.06)) speedFan2.status.setCode("FAN2 ON");
+  else if (tempCabinet < LOW_T)  speedFan2.status.setCode("FAN2 OFF"); 
   
   /*
-  if(tachMon1.rpm() == 0){
-    if(!fan1.status.alm()){
-      fan1.status.setCode("FAN1 OFF");
-      fan1.status.setAlm(NOT_ALARM);
+  if(fan1.rpm() == 0){
+    if(!speedFan1.status.alm()){
+      speedFan1.status.setCode("FAN1 OFF");
+      speedFan1.status.setAlm(NOT_ALARM);
     }
     else{
-      fan1.status.setCode("FAN1 failure!");
-      fan1.status.setAlm(ALARM);
+      speedFan1.status.setCode("FAN1 failure!");
+      speedFan1.status.setAlm(ALARM);
     }   
   }
   else{
-    fan1.status.setAlm(NOT_ALARM);
-    fan1.status.setCode("FAN1 Working!");
+    speedFan1.status.setAlm(NOT_ALARM);
+    speedFan1.status.setCode("FAN1 Working!");
   }   
-  if(tachMon2.rpm() == 0){
-    if(!fan2.status.alm()){
-      fan2.status.setCode("FAN2 OFF");
-      fan2.status.setAlm(NOT_ALARM);
+  if(fan2.rpm() == 0){
+    if(!speedFan2.status.alm()){
+      speedFan2.status.setCode("FAN2 OFF");
+      speedFan2.status.setAlm(NOT_ALARM);
     }
     else{
-      fan2.status.setCode("FAN2 failure!");
-      fan2.status.setAlm(ALARM);
+      speedFan2.status.setCode("FAN2 failure!");
+      speedFan2.status.setAlm(ALARM);
     } 
   }
   else{
-    fan2.status.setAlm(NOT_ALARM);
-    fan2.status.setCode("FAN2 Working!");
+    speedFan2.status.setAlm(NOT_ALARM);
+    speedFan2.status.setCode("FAN2 Working!");
   }
   */
 }
 doorOpenAlarm.status.setAlm(doorCabinet);
 doorOpenAlarm.writePin(doorCabinet);
-fanAlarm.status.setAlm(temp1.status.alm() or fan1.status.alm() or fan2.status.alm());
-fanAlarm.writePin(not (temp1.status.alm() or fan1.status.alm() or fan2.status.alm()));
+fanAlarm.status.setAlm(temp1.status.alm() or speedFan1.status.alm() or speedFan2.status.alm());
+fanAlarm.writePin(not (temp1.status.alm() or speedFan1.status.alm() or speedFan2.status.alm()));
 if(fanAlarm.status.alm())  fanAlarm.status.setCode("FAN's Alarms!");
 else  fanAlarm.status.setCode("FAN's is OK!");
 
@@ -399,12 +399,12 @@ Serial.print("POWER FAN MONITORING:");
 Serial.print("\nCabinet: ");  Serial.print(doorOpenAlarm.status.code()); 
 Serial.print("\nSensor Temp status: ");   Serial.print(temp1.status.code());
 Serial.print("\nSensor Temp value: ");   Serial.print(tempCabinet); Serial.print("°C");
-Serial.print("\nFAN1 status: ");  Serial.print(fan1.status.code()); 
-//Serial.print("\nFAN1 RPM: "); Serial.print(tachMon1.rpm()); Serial.print(" rpm"); 
-Serial.print("\nFAN1 PWM (%): "); Serial.print(fan1.value()); Serial.print("%"); 
-Serial.print("\nFAN2 status: ");  Serial.print(fan2.status.code()); 
-//Serial.print("\nFAN2 RPM: "); Serial.print(tachMon2.rpm()); Serial.print(" rpm");    
-Serial.print("\nFAN2 PWM (%): "); Serial.print(fan2.value()); Serial.print("%");
+Serial.print("\nFAN1 status: ");  Serial.print(speedFan1.status.code()); 
+//Serial.print("\nFAN1 RPM: "); Serial.print(fan1.rpm()); Serial.print(" rpm"); 
+Serial.print("\nFAN1 PWM (%): "); Serial.print(speedFan1.value()); Serial.print("%"); 
+Serial.print("\nFAN2 status: ");  Serial.print(speedFan2.status.code()); 
+//Serial.print("\nFAN2 RPM: "); Serial.print(fan2.rpm()); Serial.print(" rpm");    
+Serial.print("\nFAN2 PWM (%): "); Serial.print(speedFan2.value()); Serial.print("%");
 Serial.println();
 }
 

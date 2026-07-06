@@ -36,7 +36,7 @@ h1{font-size:1.2rem;color:#93c5fd}h2{font-size:1rem;color:#93c5fd;margin-top:24p
 .row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #374151}
 .row span:last-child{color:#fbbf24}
 label{display:block;margin:8px 0 2px;font-size:.85rem;color:#9ca3af}
-input{width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid #374151;background:#111827;color:#e5e7eb}
+input,select{width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid #374151;background:#111827;color:#e5e7eb}
 button{margin-top:12px;padding:10px 16px;border:0;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
 .alm{color:#f87171!important;font-weight:700}.ok{color:#34d399!important}
 small{color:#6b7280}</style></head><body>
@@ -50,13 +50,13 @@ small{color:#6b7280}</style></head><body>
 <label>MQTT Port</label><input name="mqttPort" type="number" value="%MQTTPORT%">
 <label>MQTT User</label><input name="mqttUser" value="%MQTTUSER%">
 <label>MQTT Password</label><input name="mqttPass" type="password" placeholder="(sin cambio)">
-<label>Operador (claro/cnt/tigo)</label><input name="mqttOper" value="%MQTTOPER%">
+<label>Operador</label><select name="mqttOper">%OPEROPTS%</select>
 <label>Ciudad</label><input name="mqttCity" value="%MQTTCITY%">
 <label>Sitio / RBS (la MAC se a&ntilde;ade sola)</label><input name="mqttSite" value="%MQTTSITE%">
-<label>Subsistema (power/generador/baterias/seguridad)</label><input name="mqttSubsys" value="%MQTTSUBSYS%">
+<label>Subsistema</label><select name="mqttSubsys">%SUBSYSOPTS%</select>
 <label>Temp alta &deg;C (PWM 100%)</label><input name="highTemp" type="number" step="0.5" value="%HIGHTEMP%">
 <label>Temp baja &deg;C (PWM 0%)</label><input name="lowTemp" type="number" step="0.5" value="%LOWTEMP%">
-<label>Zona horaria (horas UTC, ej. -5)</label><input name="tzOffset" type="number" step="0.25" value="%TZOFFSET%">
+<label>Zona horaria</label><select name="tzOffset">%TZOPTS%</select>
 <label>Password del portal</label><input name="webPass" type="password" placeholder="(sin cambio)">
 <button type="submit">Guardar y reiniciar</button>
 <br><small>Usuario del portal: admin</small></form></div>
@@ -106,6 +106,17 @@ private:
         strlcpy(dst, v.c_str(), dstLen);
     }
 
+    /*Build <option> items, marking the one equal to `current` as selected.*/
+    static String _selectOpts(const char* const* values, int n, const char* current){
+        String s;
+        for (int i = 0; i < n; i++){
+            s += "<option";
+            if (strcmp(values[i], current) == 0) s += " selected";
+            s += ">"; s += values[i]; s += "</option>";
+        }
+        return s;
+    }
+
     String _renderPortal(){
         String page = FPSTR(PORTAL_HTML);
         page.replace("%WIFISSID%",   _store->cfg.wifiSsid);
@@ -114,11 +125,31 @@ private:
         page.replace("%MQTTUSER%",   _store->cfg.mqttUser);
         page.replace("%HIGHTEMP%",   String(_store->cfg.highTemp, 1));
         page.replace("%LOWTEMP%",    String(_store->cfg.lowTemp, 1));
-        page.replace("%TZOFFSET%",   String(_store->cfg.tzOffset, 2));
-        page.replace("%MQTTOPER%",   _store->cfg.mqttOperator);
         page.replace("%MQTTCITY%",   _store->cfg.mqttCity);
         page.replace("%MQTTSITE%",   _store->cfg.mqttSite);
-        page.replace("%MQTTSUBSYS%", _store->cfg.mqttSubsystem);
+        static const char* const opers[]  = {"claro","cnt","tigo"};
+        static const char* const subsys[] = {"power","generador","baterias","seguridad"};
+        page.replace("%OPEROPTS%",   _selectOpts(opers, 3, _store->cfg.mqttOperator));
+        page.replace("%SUBSYSOPTS%", _selectOpts(subsys, 4, _store->cfg.mqttSubsystem));
+        /*Timezone: pick by representative city; option value = UTC offset (h).
+        No DST handling (fine for Ecuador); offsets are standard time.*/
+        struct Tz { float off; const char* label; };
+        static const Tz tzs[] = {
+            {-6, "Mexico (UTC-6)"},
+            {-5, "Guayaquil / Quito / Bogota / Lima (UTC-5)"},
+            {-4, "Santiago / Caracas / La Paz (UTC-4)"},
+            {-3, "Buenos Aires / Sao Paulo (UTC-3)"},
+            { 0, "UTC / Londres (UTC+0)"},
+            { 1, "Madrid (UTC+1)"},
+        };
+        String tzOpts;
+        for (auto& t : tzs){
+            tzOpts += "<option value=\""; tzOpts += String(t.off, 2); tzOpts += "\"";
+            float d = t.off - _store->cfg.tzOffset; if (d < 0) d = -d;
+            if (d < 0.01f) tzOpts += " selected";
+            tzOpts += ">"; tzOpts += t.label; tzOpts += "</option>";
+        }
+        page.replace("%TZOPTS%", tzOpts);
         return page;
     }
 
@@ -181,10 +212,25 @@ public:
                 if (tz >= -12.0f && tz <= 14.0f) c.tzOffset = tz;   /*ignore junk*/
             }
             if (!(c.highTemp > c.lowTemp)) { c.highTemp = 43.0f; c.lowTemp = 24.0f; }
-            bool ok = _store->save();
-            req->send(ok ? 200 : 500, "text/plain",
-                      ok ? "Guardado. Reiniciando en 2s..." : "Error al guardar");
-            if (ok) { _rebootPending = true; _rebootAt = millis() + 2000; }
+            if (!_store->save()){
+                req->send(500, "text/plain", "Error al guardar");
+                return;
+            }
+            /*Reply with a page that counts down and returns to the portal once
+            the device is back (a plain-text reply left the browser stranded on
+            /api/config). Works for changes that keep the same IP; a WiFi change
+            moves the device to another network, so the redirect may not reach.*/
+            req->send(200, "text/html",
+                "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"utf-8\">"
+                "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                "<style>body{font-family:system-ui,sans-serif;background:#111827;"
+                "color:#e5e7eb;text-align:center;padding:48px}h2{color:#34d399}</style>"
+                "</head><body><h2>Guardado &#10003;</h2>"
+                "<p id=\"m\">Reiniciando el dispositivo...</p><script>"
+                "var n=15,e=document.getElementById('m');var t=setInterval(function(){"
+                "n--;e.textContent='Reiniciando... volviendo en '+n+'s';"
+                "if(n<=0){clearInterval(t);location.href='/';}},1000);</script></body></html>");
+            _rebootPending = true; _rebootAt = millis() + 2000;
         });
 
         /*OTA: upload handler streams the .bin into the OTA partition.*/

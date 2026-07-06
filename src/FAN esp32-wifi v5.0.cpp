@@ -211,8 +211,8 @@ void setup(){
   for (int i = 0; i < 10 && !(sensorOk = temp1.tryConnection()); i++)
     delay(1000);
   if (!sensorOk) {
-    temp1.setAlm(ALARM);
-    temp1.setCode("Sensor Failure!");
+    temp1.status.setAlm(ALARM);
+    temp1.status.setCode("Sensor Failure!");
     Serial.println("\nDS18B20 NOT FOUND: degraded boot, fans at 100%");
   }
   fanAlarm.writePin(not temp1.status.alm());
@@ -255,7 +255,7 @@ void setup(){
       doc["pwm1"]      = fan1.value();
       doc["pwm2"]      = fan2.value();
       doc["door"]      = (bool)doorOpenMon.readPin();
-      doc["tempAlarm"] = (bool)temp1.alm();
+      doc["tempAlarm"] = (bool)temp1.status.alm();
       doc["fanAlarm"]  = (bool)fanAlarm.status.alm();
       xSemaphoreGive(stateMutex);
     }
@@ -313,31 +313,31 @@ if(!isnan(tempCabinet)){
   if(tempCabinet > HIGH_T){
     fan1.write(PWM_MAX);
     fan2.write(PWM_MAX);
-    temp1.setAlm(ALARM);
-    temp1.setCode("High Temperature");
+    temp1.status.setAlm(ALARM);
+    temp1.status.setCode("High Temperature");
   }
   if(tempCabinet < LOW_T){
-    temp1.setCode("Low Temperature");
+    temp1.status.setCode("Low Temperature");
   }
   if(tempCabinet < LOW_T - n/(1-n)*(HIGH_T-LOW_T)){
     fan1.write(PWM_MIN);
     fan2.write(PWM_MIN);
   }
   if(tempCabinet >= (LOW_T - n/(1-n)*(HIGH_T-LOW_T)) and tempCabinet <= HIGH_T){
-    temp1.setAlm(tempCabinet > (HIGH_T - TEMP_HISTERESIS) and temp1.alm());
+    temp1.status.setAlm(tempCabinet > (HIGH_T - TEMP_HISTERESIS) and temp1.status.alm());
     pwm = PWM_MAX*(1-n)/(HIGH_T-LOW_T)*(tempCabinet-LOW_T) + n*PWM_MAX; //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
     pwm = round(pwm*100)/100;
     fan1.write(pwm);
     fan2.write(pwm);
-    if(tempCabinet >= LOW_T and tempCabinet <= HIGH_T and !temp1.alm())
-      temp1.setCode("Temperature OK"); 
-    if (tempCabinet > (HIGH_T - TEMP_HISTERESIS) and tempCabinet <= HIGH_T and temp1.alm())
-      temp1.setCode("Temperature decreasing");
+    if(tempCabinet >= LOW_T and tempCabinet <= HIGH_T and !temp1.status.alm())
+      temp1.status.setCode("Temperature OK"); 
+    if (tempCabinet > (HIGH_T - TEMP_HISTERESIS) and tempCabinet <= HIGH_T and temp1.status.alm())
+      temp1.status.setCode("Temperature decreasing");
   } 
 }
 else{
-  temp1.setAlm(ALARM);
-  temp1.setCode("Sensor Failure!");
+  temp1.status.setAlm(ALARM);
+  temp1.status.setCode("Sensor Failure!");
   fan1.write(PWM_MAX);
   fan2.write(PWM_MAX);
 }
@@ -389,15 +389,15 @@ else{
 }
 doorOpenAlarm.status.setAlm(doorCabinet);
 doorOpenAlarm.writePin(doorCabinet);
-fanAlarm.status.setAlm(temp1.alm() or fan1.status.alm() or fan2.status.alm());
-fanAlarm.writePin(not (temp1.alm() or fan1.status.alm() or fan2.status.alm()));
+fanAlarm.status.setAlm(temp1.status.alm() or fan1.status.alm() or fan2.status.alm());
+fanAlarm.writePin(not (temp1.status.alm() or fan1.status.alm() or fan2.status.alm()));
 if(fanAlarm.status.alm())  fanAlarm.status.setCode("FAN's Alarms!");
 else  fanAlarm.status.setCode("FAN's is OK!");
 
 Serial.println();
 Serial.print("POWER FAN MONITORING:");
 Serial.print("\nCabinet: ");  Serial.print(doorOpenAlarm.status.code()); 
-Serial.print("\nSensor Temp status: ");   Serial.print(temp1.code());
+Serial.print("\nSensor Temp status: ");   Serial.print(temp1.status.code());
 Serial.print("\nSensor Temp value: ");   Serial.print(tempCabinet); Serial.print("°C");
 Serial.print("\nFAN1 status: ");  Serial.print(fan1.status.code()); 
 //Serial.print("\nFAN1 RPM: "); Serial.print(tachMon1.rpm()); Serial.print(" rpm"); 

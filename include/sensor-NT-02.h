@@ -229,8 +229,8 @@ private:
     float _temperature;
     float _upper;
     float _lower;
-    bool _alm;
-    const char* _code;
+    /*Alarm/code removed: consolidated into the inherited `status`
+    (Status = {alm, code}), consistent with every other component.*/
 
 public:
     /*CONSTRUCTOR Class DS18B20
@@ -238,9 +238,8 @@ public:
     DS18B20(u_int8_t pin, const char* id): 
     Sensor(id), _pin(pin),
     _resolution(DEFAULT_RESOLUTION), _communication(ONE_WIRE), _workingMode(SLAVE),   
-    _oneWire(pin), sensor(&_oneWire), _temperature(NAN), _alm(NOT_ALARM),
-    _code(nullptr)
-    {   
+    _oneWire(pin), sensor(&_oneWire), _temperature(NAN)
+    {
         String str = "/ds18b20/" + String(id);
         const char* topic = str.c_str();
         setTopic(topic);
@@ -262,12 +261,6 @@ public:
     u_int8_t pin() const{
         return _pin;
     }
-    const char* code() const{ 
-        return _code;
-    }
-    const boolean alm() const{
-        return _alm;
-    }
     const float upper() const{
         return _upper;
     }
@@ -277,13 +270,6 @@ public:
    
     /*SETTER atributos Class DS18B20
     ===========================================*/
-    void setCode(const char* code){
-        if(_code != nullptr)    free((void*)_code);   /*strdup() -> free()*/
-        _code = strdup(code);
-    }
-    void setAlm(boolean alm){
-        _alm = alm;
-    }
     void setUpper(float temperature){
         _upper = temperature;
     }
@@ -293,28 +279,37 @@ public:
 
     /*METHOD Class DS18B20
     ==================================================*/
-    /*Last temperature already read by the control task. Web/status paths
-    must use this instead of readTemperature(): a OneWire conversion takes
-    ~190 ms and would block the async_tcp task on every portal poll.*/
+    /*Last value the control task read: the real temperature, or NAN if the
+    sensor is not delivering one (telemetry serializes NAN as JSON null, so
+    consumers never see stale data). Web/status paths use this to avoid a
+    ~190 ms OneWire conversion in the async_tcp task.*/
     float temperature() const{
         return _temperature;
     }
-    /*Returns a validated temperature, or NAN when this cycle's reading is
-    not trustworthy. On a bad read _temperature (last good value) is kept
-    for display; callers driving actuators must treat NAN as failsafe.*/
+    /*Returns the real current temperature, or NAN when the sensor is not
+    delivering a valid reading. NAN is what telemetry/dashboard report (JSON
+    null) and what the control loop treats as failsafe -- never a stale
+    last-good value.*/
     float readTemperature() {
-        sensor.requestTemperaturesByAddress(_addr);
+        /*Re-acquire the ROM address whenever the current one stops
+        answering: recovers a sensor that was absent at boot or hot-swapped
+        for a different one, with no reboot. getAddress() rescans the bus.*/
         if(!sensor.isConnected(_addr)){
-            status.setAlm(ALARM);
-            status.setCode(DISCONNECTED);
-            return NAN;
+            if(!sensor.getAddress(_addr, 0)){
+                _temperature = NAN;
+                status.setAlm(ALARM);
+                status.setCode(DISCONNECTED);
+                return NAN;
+            }
+            sensor.setResolution(_addr, _resolution);
         }
+        sensor.requestTemperaturesByAddress(_addr);
         float t = sensor.getTempC(_addr);
         /*Reject the -127 disconnect sentinel and physically impossible
-        values (DS18B20 range is -55..125 C). A transient CRC error can
-        return -127 while isConnected() still reports true; trusting it
-        would coast the fans down on a hot cabinet.*/
+        values (DS18B20 range is -55..125 C); a transient CRC error can
+        return -127 while isConnected() still reports true.*/
         if(isnan(t) || t <= DEVICE_DISCONNECTED_C || t < -55.0f || t > 125.0f){
+            _temperature = NAN;
             status.setAlm(ALARM);
             status.setCode(DISCONNECTED);
             return NAN;
@@ -368,9 +363,7 @@ public:
         doc["temperature"] = _temperature; 
         doc["upper"] = _upper; 
         doc["lower"] = _lower; 
-        doc["status"] = status.toJson();  
-        doc["alm"] = alm();
-        doc["code"] = code();
+        doc["status"] = status.toJson();  /*{alm, code}: single alarm channel*/
         doc["workingMode"] = _workingMode;
         doc["communication"] = _communication;
         /*Build the ROM-address array in this document's pool. The old

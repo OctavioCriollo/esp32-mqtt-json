@@ -641,9 +641,20 @@ public:
     ========================================*/
     /*Agregar un sensor ya creado al objeto Sensors*/
     void add(Sensor* sensor) {
-        _map[sensor->id()].push_back(sensor);    
+        _map[sensor->id()].push_back(sensor);
     }
-        
+
+    /*Get a sensor by id, or nullptr if not present. Returns a POINTER (no
+    slicing, no copy) and compares id by content (strcmp). Generic/base
+    operations (status, toJson, ...) work through it; type-specific methods
+    still need a downcast to the concrete class.*/
+    Sensor* get(const char* id) {
+        for (auto& entry : _map)
+            for (Sensor* s : entry.second)
+                if (strcmp(s->id(), id) == 0) return s;
+        return nullptr;
+    }
+
     /*ARDUINO-JSON: Convert Class Sensors to JSON
     =================================================================*/
     JsonDocument toJson() {
@@ -870,9 +881,18 @@ public:
     ========================================*/
     /*Agregar un actuator ya creado al objeto Actuators*/
     void add(Actuator* actuator) {
-        _map[actuator->id()].push_back(actuator);    
+        _map[actuator->id()].push_back(actuator);
     }
-        
+
+    /*Get an actuator by id, or nullptr if not present. Pointer + strcmp,
+    same contract as Sensors::get().*/
+    Actuator* get(const char* id) {
+        for (auto& entry : _map)
+            for (Actuator* a : entry.second)
+                if (strcmp(a->id(), id) == 0) return a;
+        return nullptr;
+    }
+
     /*ARDUINO-JSON: Convert Class Actuators to JSON
     ===================================================================*/
     JsonDocument toJson() {

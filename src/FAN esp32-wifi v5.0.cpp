@@ -42,6 +42,7 @@ the synced clock.*/
 ConfigStore configStore;   /*NVS-backed runtime config (item G)*/
 WebPortal webPortal;       /*config/status/OTA portal (item H)*/
 bool apRescueMode = false; /*true: WiFi assoc failed, AP FanController-Setup up*/
+bool g_mqttUp = false;     /*MQTT link state, set in loop(), shown on dashboard*/
 const char* ssid;          /*bound to configStore.cfg after load()*/
 const char* password;  
 String ip;
@@ -264,6 +265,12 @@ void setup(){
     snprintf(buf, sizeof(buf), "%lud %02lu:%02lu", up/86400, (up/3600)%24, (up/60)%60);
     doc["uptime"]  = buf;
     doc["version"] = FW_VERSION;
+    doc["node"]    = String(configStore.cfg.mqttOperator) + "/" +
+                     configStore.cfg.mqttCity + "/" + configStore.cfg.mqttSite +
+                     "/" + configStore.cfg.mqttSubsystem;
+    doc["highT"]   = configStore.cfg.highTemp;
+    doc["lowT"]    = configStore.cfg.lowTemp;
+    doc["mqtt"]    = g_mqttUp;
   }, "fan-controller");
 
   last_time = millis();
@@ -472,7 +479,9 @@ void loop() {
         mqtt.publish(true,snapshot);
       if(!WIFIClient.connected())
         Serial.printf("\nFAILURE Conection to %s",mqtt.server());
+      g_mqttUp = mqttReady;   /*published for the dashboard (read in callback)*/
     }
+    else g_mqttUp = false;
     /*================================================================*/
     mqtt.client.loop();  
     //timer.tick(); // tick the timer

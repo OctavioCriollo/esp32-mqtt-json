@@ -39,8 +39,21 @@ label{display:block;margin:8px 0 2px;font-size:.85rem;color:#9ca3af}
 input,select{width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid #374151;background:#111827;color:#e5e7eb}
 button{margin-top:12px;padding:10px 16px;border:0;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
 .alm{color:#f87171!important;font-weight:700}.ok{color:#34d399!important}
-small{color:#6b7280}</style></head><body>
+small{color:#6b7280}
+.sub{color:#9ca3af;font-size:.8rem;margin:2px 0 10px;word-break:break-all}
+.big{font-size:2.6rem;font-weight:700;line-height:1}
+.unit{font-size:1rem;color:#9ca3af}
+.bar{height:10px;border-radius:5px;background:#374151;overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;border-radius:5px;transition:width .4s,background .4s}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600;margin:4px 4px 0 0}
+.pill.on{background:#064e3b;color:#34d399}.pill.off{background:#7f1d1d;color:#fca5a5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stale{opacity:.4}
+.warn{background:#7f1d1d;color:#fecaca;padding:8px 12px;border-radius:8px;margin:8px 0;max-width:560px;display:none}
+</style></head><body>
 <h1>FAN Controller &mdash; Power/Climatizaci&oacute;n</h1>
+<div class="sub" id="sub">&nbsp;</div>
+<div class="warn" id="warn">Sin conexi&oacute;n con el dispositivo &mdash; mostrando el &uacute;ltimo dato</div>
 <div class="card" id="st">Cargando estado...</div>
 <div class="card"><h2>Configuraci&oacute;n</h2>
 <form method="POST" action="/api/config">
@@ -66,20 +79,48 @@ small{color:#6b7280}</style></head><body>
 <button type="submit">Actualizar firmware</button>
 <br><small>Sube el firmware.bin generado por el CI</small></form></div>
 <script>
-async function poll(){try{
- const r=await fetch('/api/status');const d=await r.json();
- const a=x=>x?'<span class="alm">ALARMA</span>':'<span class="ok">OK</span>';
- document.getElementById('st').innerHTML=
-  '<h2>Estado</h2>'+
-  '<div class="row"><span>Temperatura</span><span>'+d.temp.toFixed(1)+' &deg;C</span></div>'+
-  '<div class="row"><span>FAN1 / FAN2 PWM</span><span>'+d.pwm1.toFixed(0)+'% / '+d.pwm2.toFixed(0)+'%</span></div>'+
-  '<div class="row"><span>Puerta</span><span>'+(d.door?'ABIERTA':'cerrada')+'</span></div>'+
-  '<div class="row"><span>Sensor</span><span>'+a(d.tempAlarm)+'</span></div>'+
-  '<div class="row"><span>Ventiladores</span><span>'+a(d.fanAlarm)+'</span></div>'+
-  '<div class="row"><span>WiFi RSSI</span><span>'+d.rssi+' dBm</span></div>'+
-  '<div class="row"><span>Uptime</span><span>'+d.uptime+'</span></div>'+
-  '<div class="row"><span>Firmware</span><span>'+d.version+'</span></div>';
-}catch(e){}}
+var hist=[];
+function tcol(t,lo,hi){return t>=hi?'#f87171':(t>=hi-3?'#fbbf24':'#34d399');}
+function spark(){
+ if(hist.length<2)return'';
+ var w=280,h=38,mn=Math.min.apply(null,hist),mx=Math.max.apply(null,hist);
+ if(mx-mn<1)mx=mn+1;
+ var p=hist.map(function(v,i){return(i*w/(hist.length-1)).toFixed(1)+','+(h-(v-mn)/(mx-mn)*h).toFixed(1);}).join(' ');
+ return'<svg width="100%" height="38" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><polyline fill="none" stroke="#60a5fa" stroke-width="2" points="'+p+'"/></svg>';
+}
+function pill(on,t){return'<span class="pill '+(on?'on':'off')+'">'+t+'</span>';}
+async function poll(){
+ var st=document.getElementById('st');
+ try{
+  const r=await fetch('/api/status');const d=await r.json();
+  document.getElementById('warn').style.display='none';st.classList.remove('stale');
+  if(d.node)document.getElementById('sub').textContent=d.node;
+  var t=d.temp,tok=(t!=null&&!isNaN(t));
+  if(tok){hist.push(t);if(hist.length>60)hist.shift();}
+  var lo=(d.lowT!=null?d.lowT:24),hi=(d.highT!=null?d.highT:43);
+  var pct=tok?Math.max(0,Math.min(100,(t-lo)/(hi-lo)*100)):0;
+  var col=tok?tcol(t,lo,hi):'#9ca3af';
+  st.innerHTML=
+   '<div class="big" style="color:'+col+'">'+(tok?t.toFixed(1):'--')+'<span class="unit"> &deg;C</span></div>'+
+   '<div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div>'+
+   '<small>rango '+lo.toFixed(0)+'&ndash;'+hi.toFixed(0)+' &deg;C</small>'+spark()+
+   '<div class="grid" style="margin-top:12px">'+
+    '<div><small>FAN1</small><div class="bar"><i style="width:'+d.pwm1+'%;background:#60a5fa"></i></div><b>'+d.pwm1.toFixed(0)+'%</b></div>'+
+    '<div><small>FAN2</small><div class="bar"><i style="width:'+d.pwm2+'%;background:#60a5fa"></i></div><b>'+d.pwm2.toFixed(0)+'%</b></div>'+
+   '</div>'+
+   '<div style="margin-top:10px">'+
+    pill(!d.tempAlarm,d.tempAlarm?'Sensor ALARMA':'Sensor OK')+
+    pill(!d.fanAlarm,d.fanAlarm?'FANs ALARMA':'FANs OK')+
+    pill(!d.door,d.door?'Puerta ABIERTA':'Puerta cerrada')+
+    pill(d.mqtt,d.mqtt?'MQTT conectado':'MQTT sin conexion')+
+   '</div>'+
+   '<div class="row" style="margin-top:12px"><span>WiFi</span><span>'+d.rssi+' dBm</span></div>'+
+   '<div class="row"><span>Uptime</span><span>'+d.uptime+'</span></div>'+
+   '<div class="row"><span>Firmware</span><span>v'+d.version+'</span></div>';
+ }catch(e){
+  st.classList.add('stale');document.getElementById('warn').style.display='block';
+ }
+}
 poll();setInterval(poll,2000);
 </script></body></html>
 )HTML";

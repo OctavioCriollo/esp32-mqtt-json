@@ -65,7 +65,7 @@ public:
         cfg.lowTemp  = _prefs.getFloat("lowTemp",  24.0f);
         cfg.tzOffset = _prefs.getFloat("tzOffset", -5.0f);
         _getStr("mqttOper",  cfg.mqttOperator,  sizeof(cfg.mqttOperator),  "claro");
-        _getStr("mqttCity",  cfg.mqttCity,      sizeof(cfg.mqttCity),      "ciudad");
+        _getStr("mqttCity",  cfg.mqttCity,      sizeof(cfg.mqttCity),      "guayaquil");
         _getStr("mqttSite",  cfg.mqttSite,      sizeof(cfg.mqttSite),      "RBS-000");
         _getStr("mqttSubsys",cfg.mqttSubsystem, sizeof(cfg.mqttSubsystem), "power");
         _prefs.end();

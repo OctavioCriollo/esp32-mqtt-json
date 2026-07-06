@@ -50,9 +50,10 @@ small{color:#6b7280}</style></head><body>
 <label>MQTT Port</label><input name="mqttPort" type="number" value="%MQTTPORT%">
 <label>MQTT User</label><input name="mqttUser" value="%MQTTUSER%">
 <label>MQTT Password</label><input name="mqttPass" type="password" placeholder="(sin cambio)">
-<label>Operador (topic)</label><input name="mqttOper" value="%MQTTOPER%">
-<label>Sitio / RBS (topic, &uacute;nico)</label><input name="mqttSite" value="%MQTTSITE%">
-<label>Subsistema (topic)</label><input name="mqttSubsys" value="%MQTTSUBSYS%">
+<label>Operador (claro/cnt/tigo)</label><input name="mqttOper" value="%MQTTOPER%">
+<label>Ciudad</label><input name="mqttCity" value="%MQTTCITY%">
+<label>Sitio / RBS (la MAC se a&ntilde;ade sola)</label><input name="mqttSite" value="%MQTTSITE%">
+<label>Subsistema (power/generador/baterias/seguridad)</label><input name="mqttSubsys" value="%MQTTSUBSYS%">
 <label>Temp alta &deg;C (PWM 100%)</label><input name="highTemp" type="number" step="0.5" value="%HIGHTEMP%">
 <label>Temp baja &deg;C (PWM 0%)</label><input name="lowTemp" type="number" step="0.5" value="%LOWTEMP%">
 <label>Zona horaria (horas UTC, ej. -5)</label><input name="tzOffset" type="number" step="0.25" value="%TZOFFSET%">
@@ -115,6 +116,7 @@ private:
         page.replace("%LOWTEMP%",    String(_store->cfg.lowTemp, 1));
         page.replace("%TZOFFSET%",   String(_store->cfg.tzOffset, 2));
         page.replace("%MQTTOPER%",   _store->cfg.mqttOperator);
+        page.replace("%MQTTCITY%",   _store->cfg.mqttCity);
         page.replace("%MQTTSITE%",   _store->cfg.mqttSite);
         page.replace("%MQTTSUBSYS%", _store->cfg.mqttSubsystem);
         return page;
@@ -166,6 +168,7 @@ public:
             _copyParam(req, "mqttUser",   c.mqttUser,   sizeof(c.mqttUser),   false);
             _copyParam(req, "mqttPass",   c.mqttPass,   sizeof(c.mqttPass),   true);
             _copyParam(req, "mqttOper",   c.mqttOperator,  sizeof(c.mqttOperator),  false);
+            _copyParam(req, "mqttCity",   c.mqttCity,      sizeof(c.mqttCity),      false);
             _copyParam(req, "mqttSite",   c.mqttSite,      sizeof(c.mqttSite),      false);
             _copyParam(req, "mqttSubsys", c.mqttSubsystem, sizeof(c.mqttSubsystem), false);
             _copyParam(req, "webPass",    c.webPass,    sizeof(c.webPass),    true);

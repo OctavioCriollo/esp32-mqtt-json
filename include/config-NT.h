@@ -31,11 +31,13 @@ struct AppConfig {
     float highTemp;   /*PWM = 100% at/above*/
     float lowTemp;    /*PWM = 0% at/below*/
     float tzOffset;   /*UTC offset in hours for SNTP (e.g. -5.0 = Ecuador)*/
-    /*MQTT topic hierarchy, built as operator/site/subsystem/{telemetria,control}.
-    site is unique per board (per RBS) so one firmware serves the whole fleet.*/
-    char mqttOperator[24];   /*e.g. "Claro"*/
-    char mqttSite[24];       /*unique RBS site id, e.g. "UIO-001"*/
-    char mqttSubsystem[24];  /*subsystem/role, e.g. "RBS" (multi) or "FAN"*/
+    /*MQTT topic: operator/city/site-MAC/subsystem/{telemetria,control}. The
+    device MAC is appended to the site at boot, so it is globally unique and
+    one firmware serves the whole fleet.*/
+    char mqttOperator[24];   /*claro, cnt, tigo*/
+    char mqttCity[24];       /*e.g. "quito", "guayaquil"*/
+    char mqttSite[24];       /*RBS name; the MAC is appended automatically*/
+    char mqttSubsystem[24];  /*power, generador, baterias, seguridad*/
 };
 
 class ConfigStore {
@@ -62,9 +64,10 @@ public:
         cfg.highTemp = _prefs.getFloat("highTemp", 43.0f);
         cfg.lowTemp  = _prefs.getFloat("lowTemp",  24.0f);
         cfg.tzOffset = _prefs.getFloat("tzOffset", -5.0f);
-        _getStr("mqttOper",  cfg.mqttOperator,  sizeof(cfg.mqttOperator),  "Claro");
-        _getStr("mqttSite",  cfg.mqttSite,      sizeof(cfg.mqttSite),      "SITE-000");
-        _getStr("mqttSubsys",cfg.mqttSubsystem, sizeof(cfg.mqttSubsystem), "RBS");
+        _getStr("mqttOper",  cfg.mqttOperator,  sizeof(cfg.mqttOperator),  "claro");
+        _getStr("mqttCity",  cfg.mqttCity,      sizeof(cfg.mqttCity),      "ciudad");
+        _getStr("mqttSite",  cfg.mqttSite,      sizeof(cfg.mqttSite),      "RBS-000");
+        _getStr("mqttSubsys",cfg.mqttSubsystem, sizeof(cfg.mqttSubsystem), "power");
         _prefs.end();
         /*Sanity: a broken saved range must never disable cooling.*/
         if (!(cfg.highTemp > cfg.lowTemp)) { cfg.highTemp = 43.0f; cfg.lowTemp = 24.0f; }
@@ -85,6 +88,7 @@ public:
         _prefs.putFloat("lowTemp",    cfg.lowTemp);
         _prefs.putFloat("tzOffset",   cfg.tzOffset);
         _prefs.putString("mqttOper",  cfg.mqttOperator);
+        _prefs.putString("mqttCity",  cfg.mqttCity);
         _prefs.putString("mqttSite",  cfg.mqttSite);
         _prefs.putString("mqttSubsys",cfg.mqttSubsystem);
         _prefs.end();

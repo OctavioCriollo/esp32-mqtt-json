@@ -143,17 +143,20 @@ void setup(){
   mqtt.setPort(mqtt_port);
   mqtt.setUser(mqtt_user);
   mqtt.setPassword(mqtt_password);
-  /*Build the topic hierarchy and client id from per-site config:
-  operator/site/subsystem/{telemetria,control}. site is unique per board, so
-  the same firmware serves the whole fleet and enables wildcard ACLs.*/
+  /*Build the topic hierarchy and client id from config:
+  operator/city/site-MAC/subsystem/{telemetria,control}. The device MAC is
+  appended to the site, so it is globally unique; one firmware serves the
+  whole fleet and wildcard ACLs work (e.g. claro/+/+/power/telemetria).*/
+  String mac = WiFi.macAddress(); mac.replace(":", "");
+  String siteId = String(configStore.cfg.mqttSite) + "-" + mac;
   String topicBase = String(configStore.cfg.mqttOperator) + "/" +
-                     configStore.cfg.mqttSite + "/" + configStore.cfg.mqttSubsystem;
+                     configStore.cfg.mqttCity + "/" + siteId + "/" +
+                     configStore.cfg.mqttSubsystem;
   mqtt_topic_pub = topicBase + "/telemetria";
   mqtt_topic_sub = topicBase + "/control";
   mqtt.setTopicPUB(mqtt_topic_pub.c_str());
   mqtt.setTopicSUB(mqtt_topic_sub.c_str());
-  mqtt_ID = String(configStore.cfg.mqttSite) + "-" + configStore.cfg.mqttSubsystem +
-            " (" + WiFi.macAddress() + ")";
+  mqtt_ID = siteId + "-" + configStore.cfg.mqttSubsystem;
   mqtt.setId(mqtt_ID.c_str());
 
   if(wifi_connect(ssid,password,WIFI_BOOT_ATTEMPTS)){

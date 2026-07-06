@@ -28,8 +28,8 @@ include/secrets.h.example and fill in real values.*/
 
 #define FW_VERSION "6.0"
 #define MQTT_ID "Controller-iot"
-#define MQTT_TOPIC_SUB "/FAN/control"
-#define MQTT_TOPIC_PUB "/FAN/monitoring"
+#define MQTT_TOPIC_SUB "/Claro/RBS/FAN/control"
+#define MQTT_TOPIC_PUB "/Claro/RBS/FAN/monitoring"
 #define MQTT_RETRY_MS 15000   /*min gap between MQTT/TLS reconnect attempts*/
 #define WIFI_BOOT_ATTEMPTS 10 /*~10 s STA association window at boot (was 5)*/
 #define AP_RESCUE_RETRY_MS 180000 /*retry STA every 3 min while in AP rescue*/
@@ -155,7 +155,15 @@ void setup(){
     #else
     WIFIClient.setCACert(CA_CERT);
     #endif
-    configTime((long)(configStore.cfg.tzOffset*3600), DAYLIGHT_OFFSET_SEC, NTP_SERVER);  /*sync clock*/
+    configTime((long)(configStore.cfg.tzOffset*3600), DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+    /*Real-cert TLS validates the broker certificate's dates against the
+    system clock; an unsynced clock (1970) fails the handshake with a date
+    error. SNTP syncs asynchronously, so wait (bounded) for a valid time
+    before the first TLS/MQTT connect. Safe to block here: fans are at the
+    failsafe PWM_MAX and the task watchdog is not armed yet.*/
+    struct tm _tsync;
+    if(!getLocalTime(&_tsync, 8000))
+      Serial.println("\nWARNING: clock not synced in 8s; first MQTT connect may retry");
     if(mqtt.connect(1)){
       //mqtt.client.setCallback(callback);
       mqtt.subscribe();

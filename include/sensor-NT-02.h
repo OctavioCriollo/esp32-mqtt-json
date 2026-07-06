@@ -6,12 +6,28 @@
 #include <Adafruit_I2CDevice.h>
 #include <Adafruit_Sensor.h>
 #include <SPI.h>
+#include <time.h>
 #include <map>
 #include <vector>
 
 /*Default Timestamp
 ==============================================*/
-#define DEFAULT_TIMESTAMP "2023-08-03T12:34:56z"
+/*Fallback used only until the system clock is synced by SNTP (see
+nowIso8601). configTime() runs from the main after WiFi connects.*/
+#define DEFAULT_TIMESTAMP "2026-07-05T00:00:00"
+
+/*Current time as ISO 8601, read from the ESP32 system clock (synced by
+configTime()/SNTP in the main). No network access at call time. Returns
+DEFAULT_TIMESTAMP while the clock is not yet synced (first seconds after
+boot, or in AP-rescue mode with no internet).*/
+inline String nowIso8601(){
+    struct tm t;
+    if(!getLocalTime(&t, 5))          /*5 ms; false if not synced yet*/
+        return DEFAULT_TIMESTAMP;
+    char buf[25];
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &t);
+    return String(buf);
+}
 
 /*Default Resolution
 ==============================================*/
@@ -367,7 +383,7 @@ public:
         doc["addrStr"] = addrStr();
         //doc["label"] = label();                    
         doc["topic"] = topic();
-        doc["timestamp"] = timestamp();
+        doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     }       
    
@@ -431,7 +447,7 @@ public:
         //Code 
         //doc["label"] = label(); 
         doc["topic"] = topic();
-        doc["timestamp"] = timestamp();
+        doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     }    
 };
@@ -493,7 +509,7 @@ public:
         doc["model"] = model();            
         //doc["label"] = label();
         doc["topic"] = topic();
-        doc["timestamp"] = timestamp();
+        doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     }    
 };
@@ -537,7 +553,7 @@ public:
         doc["state"] = _state;
         //doc["label"] = label();  
         doc["topic"] = topic();
-        doc["timestamp"] = timestamp();
+        doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     }    
 };
@@ -614,7 +630,7 @@ public:
         doc["rpm"] = _rpm;
         //doc["label"] = label();  
         doc["topic"] = topic();
-        doc["timestamp"] = timestamp();
+        doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     }    
 };
@@ -789,7 +805,7 @@ public:
         doc["value"] = _value;
         doc["status"] = status.toJson();
         doc["topic"] = topic();
-        doc["timestamp"] = timestamp();
+        doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     } 
 };
@@ -843,7 +859,7 @@ public:
         //doc["label"] = label();  
         doc["status"] = status.toJson(); 
         doc["topic"] = topic();
-        doc["timestamp"] = timestamp();
+        doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     }    
 };
@@ -988,7 +1004,7 @@ public:
         obj["IP"] = _IP;
         obj["status"] = status.toJson();
         obj["topic"] = _topic;
-        obj["timestamp"] = _timestamp;
+        obj["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
     } 
 };

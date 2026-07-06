@@ -41,7 +41,7 @@ const char* ssid;          /*bound to configStore.cfg after load()*/
 const char* password;  
 String ip;
 /*Real timestamps are pending via ESP32 SNTP configTime(); the old
-NTPClient/WiFiUDP approach was removed. See MCU-ESP32 Code/docs/lab-01-roadmap.md.*/
+NTPClient/WiFiUDP approach was removed. See docs/lab-01-roadmap.md.*/
 /*========================================================*/
 
 const char* mqtt_server;
@@ -71,7 +71,7 @@ volatile float pwm = 100;
 float n = 0.1;  /*FAN se apaga al 10% del PWM MAX*/
 boolean doorOpenCabinet = OPEN;
 ulong current_time, last_time;
-/*event-driven networking globals removed; see MCU-ESP32 Code/docs/lab-01-roadmap.md*/
+/*event-driven networking globals removed; see docs/lab-01-roadmap.md*/
 
 DS18B20 temp1(ONE_WIRE_PIN,"temp1");
 PWM fan1(PWM_FAN_1,pwm_channel0,pwm_freq,pwm_resolution,"fan1");

@@ -212,7 +212,7 @@ void setup(){
     delay(1000);
   if (!sensorOk) {
     temp1.status.setAlm(ALARM);
-    temp1.status.setCode("Sensor Failure!");
+    temp1.status.setCode(SENSOR_FAILURE);
     Serial.println("\nDS18B20 NOT FOUND: degraded boot, fans at 100%");
   }
   fanAlarm.writePin(not temp1.status.alm());
@@ -310,34 +310,43 @@ Either way the fans go to full and the alarm fires; a garbage low value
 must never be allowed to coast the fans down. This also avoids a second
 OneWire round-trip that the old isConnected() guard incurred.*/
 if(!isnan(tempCabinet)){
+  /*Fan speed control (unchanged): full above HIGH_T, off below the low
+  hysteresis point, proportional PWM in between. Zones are mutually
+  exclusive.*/
   if(tempCabinet > HIGH_T){
     speedFan1.write(PWM_MAX);
     speedFan2.write(PWM_MAX);
-    temp1.status.setAlm(ALARM);
-    temp1.status.setCode("High Temperature");
   }
-  if(tempCabinet < LOW_T){
-    temp1.status.setCode("Low Temperature");
-  }
-  if(tempCabinet < LOW_T - n/(1-n)*(HIGH_T-LOW_T)){
+  else if(tempCabinet < LOW_T - n/(1-n)*(HIGH_T-LOW_T)){
     speedFan1.write(PWM_MIN);
     speedFan2.write(PWM_MIN);
   }
-  if(tempCabinet >= (LOW_T - n/(1-n)*(HIGH_T-LOW_T)) and tempCabinet <= HIGH_T){
-    temp1.status.setAlm(tempCabinet > (HIGH_T - TEMP_HISTERESIS) and temp1.status.alm());
+  else{
     pwm = PWM_MAX*(1-n)/(HIGH_T-LOW_T)*(tempCabinet-LOW_T) + n*PWM_MAX; //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
     pwm = round(pwm*100)/100;
     speedFan1.write(pwm);
     speedFan2.write(pwm);
-    if(tempCabinet >= LOW_T and tempCabinet <= HIGH_T and !temp1.status.alm())
-      temp1.status.setCode("Temperature OK"); 
-    if (tempCabinet > (HIGH_T - TEMP_HISTERESIS) and tempCabinet <= HIGH_T and temp1.status.alm())
-      temp1.status.setCode("Temperature decreasing");
-  } 
+  }
+  /*Temperature-LEVEL alarm (distinct from the sensor-failure alarm, which
+  the library sets in readTemperature). HIGH is critical (drives the relay);
+  LOW is informational (not critical). Hysteresis holds the high alarm until
+  temp drops below HIGH_T - TEMP_HISTERESIS.*/
+  if(tempCabinet > HIGH_T){
+    temp1.status.setAlm(ALARM);      temp1.status.setCode(HIGH_TEMP);
+  }
+  else if(tempCabinet > HIGH_T - TEMP_HISTERESIS and temp1.status.alm()){
+    temp1.status.setCode(TEMP_DECREASING);   /*hold alarm through hysteresis band*/
+  }
+  else if(tempCabinet < LOW_T){
+    temp1.status.setAlm(NOT_ALARM);  temp1.status.setCode(LOW_TEMP);
+  }
+  else{
+    temp1.status.setAlm(NOT_ALARM);  temp1.status.setCode(OK);
+  }
 }
 else{
   temp1.status.setAlm(ALARM);
-  temp1.status.setCode("Sensor Failure!");
+  temp1.status.setCode(SENSOR_FAILURE);
   speedFan1.write(PWM_MAX);
   speedFan2.write(PWM_MAX);
 }

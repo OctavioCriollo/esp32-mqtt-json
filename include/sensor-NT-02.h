@@ -83,6 +83,13 @@ inline String nowIso8601(){
 #define WORKING "Working"
 #define DISCONNECTED "Disconnected"
 #define FAILURE "Failure"
+/*Specific alarm codes (the code distinguishes the cause; alm is the flag)*/
+#define SENSOR_FAILURE "Sensor Failure"          /*health: cannot read the sensor*/
+#define HIGH_TEMP "High Temperature"              /*level: above upper (critical)*/
+#define LOW_TEMP "Low Temperature"                /*level: below lower (non-critical)*/
+#define TEMP_DECREASING "Temperature decreasing"  /*level: high alarm cooling (hysteresis)*/
+#define FAN_STOPPED "Fan Stopped"                 /*tachometer: RPM below minimum*/
+#define FAN_WORKING "Fan Working"                 /*tachometer: RPM OK*/
 
 /*Platform Device
 ===================================*/

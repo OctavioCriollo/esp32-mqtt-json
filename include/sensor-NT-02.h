@@ -605,7 +605,7 @@ public:
     void resetTime(){
         _lastTime = millis();
     }
-    void count(){
+    void IRAM_ATTR count(){   /*called from an ISR: must live in IRAM*/
         _pulses = _pulses + 1;   /*volatile ++ is deprecated since C++20*/
     }
     void setRPM(unsigned long timing){
@@ -628,7 +628,8 @@ public:
         doc["model"] = model();     
         doc["pulses"] = pulses();
         doc["rpm"] = _rpm;
-        //doc["label"] = label();  
+        doc["status"] = status.toJson();   /*fan alarm: set by the main from RPM*/
+        //doc["label"] = label();
         doc["topic"] = topic();
         doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;

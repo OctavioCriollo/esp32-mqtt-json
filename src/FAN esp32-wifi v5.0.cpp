@@ -16,6 +16,7 @@ Copyright (c) 2023 Octavio Criollo.
 u_int8_t pwm_resolution = 10;
 u_int8_t pwm_channel0 = 0, pwm_channel1 = 1;
 int pwm_freq = 10000;
+u_int8_t fan_pulses_per_rev = 2;   /*tach pulses per revolution (typical DC fan; check the datasheet)*/
 
 /*WIFI AND MQTT INFORMATION
 Credentials live in include/secrets.h (gitignored). Copy
@@ -82,8 +83,8 @@ ulong current_time, last_time;
 DS18B20 temp1(ONE_WIRE_PIN,"temp1");
 PWM speedFan1(PWM_FAN_1,pwm_channel0,pwm_freq,pwm_resolution,"speedFan1");
 PWM speedFan2(PWM_FAN_2,pwm_channel1,pwm_freq,pwm_resolution,"speedFan2");
-//TACHOMETER fan1(TACH_FAN_1,INPUT_PULLUP,3,"fan1");
-//TACHOMETER fan2(TACH_FAN_2,INPUT_PULLUP,3,"fan2");  /*TACH_FAN_2: Cambiar GPIO0 a GPIO12*/
+TACHOMETER fan1(TACH_FAN_1,INPUT_PULLUP,fan_pulses_per_rev,"fan1");
+TACHOMETER fan2(TACH_FAN_2,INPUT_PULLUP,fan_pulses_per_rev,"fan2");
 PINSTATE doorOpenMon(IN_1,INPUT_PULLUP,"doorOpenMon");
 PINCONTROL doorOpenAlarm(RELAY_OUT_1,OUTPUT,"doorOpenAlarm");
 PINCONTROL fanAlarm(RELAY_OUT_2,OUTPUT,"fanAlarm");
@@ -115,14 +116,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
   serializeJson(doc,Serial);
   Serial.println();
 }
-/*
 void IRAM_ATTR isr1(){
   fan1.count();
 }
 void IRAM_ATTR isr2(){
   fan2.count();
 }
-*/
 /*Item F globals: defined here so setup() can reference them; the task
 implementation lives after the control-cycle function below.*/
 SemaphoreHandle_t stateMutex;
@@ -221,8 +220,8 @@ void setup(){
 
   sensors.add(&temp1);
   sensors.add(&doorOpenMon);
-  //sensors.add(&fan1);
-  //sensors.add(&fan2);
+  sensors.add(&fan1);
+  sensors.add(&fan2);
   actuators.add(&speedFan1);
   actuators.add(&speedFan2);
   actuators.add(&doorOpenAlarm);
@@ -254,6 +253,10 @@ void setup(){
       doc["temp"]      = temp1.temperature();   /*cached: no OneWire here*/
       doc["pwm1"]      = speedFan1.value();
       doc["pwm2"]      = speedFan2.value();
+      doc["fan1Rpm"]   = fan1.rpm();
+      doc["fan2Rpm"]   = fan2.rpm();
+      doc["fan1Alarm"] = (bool)fan1.status.alm();
+      doc["fan2Alarm"] = (bool)fan2.status.alm();
       doc["door"]      = (bool)doorOpenMon.readPin();
       doc["tempAlarm"] = (bool)temp1.status.alm();
       doc["tempCode"]  = temp1.status.code();   /*OK/High Temperature/Low.../Sensor Failure*/
@@ -275,18 +278,15 @@ void setup(){
   }, "fan-controller");
 
   last_time = millis();
-  //last_wifi_event_time = millis();  //Last wifi event time
-  //last_mqtt_event_time = millis();  //Last MQTT event time
-  
-  /*
+
+  /*Tachometers (fan1/fan2): count pulses by interrupt on the falling edge.
+  RPM is computed once per control cycle from the accumulated pulses.*/
   fan1.enableISR(FALLING,isr1);
   fan1.resetTime();
   fan1.resetCount();
   fan2.enableISR(FALLING,isr2);
   fan2.resetTime();
-  fan2.resetTime();
-  //timer.every(1000,timerCallback);
-  */
+  fan2.resetCount();
 }
 
 /*==================================================================
@@ -366,54 +366,46 @@ else{
   if(!speedFan2.status.alm() and tempCabinet > LOW_T*(1 + 0.06)) speedFan2.status.setCode("FAN2 ON");
   else if (tempCabinet < LOW_T)  speedFan2.status.setCode("FAN2 OFF"); 
   
-  /*
-  if(fan1.rpm() == 0){
-    if(!speedFan1.status.alm()){
-      speedFan1.status.setCode("FAN1 OFF");
-      speedFan1.status.setAlm(NOT_ALARM);
-    }
-    else{
-      speedFan1.status.setCode("FAN1 failure!");
-      speedFan1.status.setAlm(ALARM);
-    }   
-  }
-  else{
-    speedFan1.status.setAlm(NOT_ALARM);
-    speedFan1.status.setCode("FAN1 Working!");
-  }   
-  if(fan2.rpm() == 0){
-    if(!speedFan2.status.alm()){
-      speedFan2.status.setCode("FAN2 OFF");
-      speedFan2.status.setAlm(NOT_ALARM);
-    }
-    else{
-      speedFan2.status.setCode("FAN2 failure!");
-      speedFan2.status.setAlm(ALARM);
-    } 
-  }
-  else{
-    speedFan2.status.setAlm(NOT_ALARM);
-    speedFan2.status.setCode("FAN2 Working!");
-  }
-  */
+  /*Fan-failure logic lives below (after the door block) so it is gated by
+  the commanded speedFan value, not nested in the door-closed branch.*/
 }
 doorOpenAlarm.status.setAlm(doorCabinet);
 doorOpenAlarm.writePin(doorCabinet);
-fanAlarm.status.setAlm(temp1.status.alm() or speedFan1.status.alm() or speedFan2.status.alm());
-fanAlarm.writePin(not (temp1.status.alm() or speedFan1.status.alm() or speedFan2.status.alm()));
-if(fanAlarm.status.alm())  fanAlarm.status.setCode("FAN's Alarms!");
-else  fanAlarm.status.setCode("FAN's is OK!");
+
+/*Fan RPM + failure alarm from the tachometers (fan1/fan2). Measured once
+per cycle; gated by the commanded speed so a fan intentionally off (door
+open or cold) never false-alarms -- only "commanded to spin but RPM 0".*/
+static ulong lastRpmTime = millis();
+ulong nowRpm = millis();
+ulong fanTiming = nowRpm - lastRpmTime; lastRpmTime = nowRpm;
+if(fanTiming == 0) fanTiming = 1;
+fan1.setRPM(fanTiming);
+fan2.setRPM(fanTiming);
+if(speedFan1.value() <= 0){ fan1.status.setAlm(NOT_ALARM); fan1.status.setCode("Fan Off"); }
+else if(fan1.rpm() == 0){   fan1.status.setAlm(ALARM);     fan1.status.setCode(FAN_STOPPED); }
+else{                       fan1.status.setAlm(NOT_ALARM); fan1.status.setCode(FAN_WORKING); }
+if(speedFan2.value() <= 0){ fan2.status.setAlm(NOT_ALARM); fan2.status.setCode("Fan Off"); }
+else if(fan2.rpm() == 0){   fan2.status.setAlm(ALARM);     fan2.status.setCode(FAN_STOPPED); }
+else{                       fan2.status.setAlm(NOT_ALARM); fan2.status.setCode(FAN_WORKING); }
+
+/*Interim: RELAY_OUT_2 fires on any cooling problem (high temp / sensor
+fault / a stopped fan). The configurable-I/O phase will split temperature
+and fan into separate, portal-assignable relays.*/
+fanAlarm.status.setAlm(temp1.status.alm() or fan1.status.alm() or fan2.status.alm());
+fanAlarm.writePin(not (temp1.status.alm() or fan1.status.alm() or fan2.status.alm()));
+if(fanAlarm.status.alm())  fanAlarm.status.setCode("Cooling Alarm");
+else  fanAlarm.status.setCode("Cooling OK");
 
 Serial.println();
 Serial.print("POWER FAN MONITORING:");
 Serial.print("\nCabinet: ");  Serial.print(doorOpenAlarm.status.code()); 
 Serial.print("\nSensor Temp status: ");   Serial.print(temp1.status.code());
 Serial.print("\nSensor Temp value: ");   Serial.print(tempCabinet); Serial.print("°C");
-Serial.print("\nFAN1 status: ");  Serial.print(speedFan1.status.code()); 
-//Serial.print("\nFAN1 RPM: "); Serial.print(fan1.rpm()); Serial.print(" rpm"); 
-Serial.print("\nFAN1 PWM (%): "); Serial.print(speedFan1.value()); Serial.print("%"); 
-Serial.print("\nFAN2 status: ");  Serial.print(speedFan2.status.code()); 
-//Serial.print("\nFAN2 RPM: "); Serial.print(fan2.rpm()); Serial.print(" rpm");    
+Serial.print("\nFAN1 status: ");  Serial.print(fan1.status.code());
+Serial.print("\nFAN1 RPM: "); Serial.print(fan1.rpm()); Serial.print(" rpm");
+Serial.print("\nFAN1 PWM (%): "); Serial.print(speedFan1.value()); Serial.print("%");
+Serial.print("\nFAN2 status: ");  Serial.print(fan2.status.code());
+Serial.print("\nFAN2 RPM: "); Serial.print(fan2.rpm()); Serial.print(" rpm");
 Serial.print("\nFAN2 PWM (%): "); Serial.print(speedFan2.value()); Serial.print("%");
 Serial.println();
 }

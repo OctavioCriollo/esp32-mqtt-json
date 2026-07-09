@@ -31,8 +31,8 @@ de proteccion de corriente mediante fusibles de 5A a 6A.
 #define PWM_FAN_1 GPIO_NUM_13
 #define PWM_FAN_2 GPIO_NUM_14
 #define TACH_FAN_1 GPIO_NUM_2
-#define TACH_FAN_2 GPIO_NUM_0
-//#define TACH_FAN_2 GPIO_NUM_12
+//#define TACH_FAN_2 GPIO_NUM_0     /*old board: GPIO0 is a boot-strap pin*/
+#define TACH_FAN_2 GPIO_NUM_12      /*new board v3.x: GPIO0 rewired to GPIO12*/
 
 /*Relays Outputs GPIO Pins*/
 #define RELAY_OUT_1 GPIO_NUM_17     //Relay OUT1

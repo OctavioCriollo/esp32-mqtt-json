@@ -30,98 +30,192 @@ static const char PORTAL_HTML[] PROGMEM = R"HTML(
 <!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FAN Controller</title><style>
-body{font-family:system-ui,sans-serif;background:#111827;color:#e5e7eb;margin:0;padding:16px}
-h1{font-size:1.2rem;color:#93c5fd}h2{font-size:1rem;color:#93c5fd;margin-top:24px}
-.card{background:#1f2937;border-radius:10px;padding:14px;margin:10px 0;max-width:560px}
-.row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #374151}
-.row span:last-child{color:#fbbf24}
-label{display:block;margin:8px 0 2px;font-size:.85rem;color:#9ca3af}
-input,select{width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid #374151;background:#111827;color:#e5e7eb}
-button{margin-top:12px;padding:10px 16px;border:0;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
-.alm{color:#f87171!important;font-weight:700}.ok{color:#34d399!important}
-small{color:#6b7280}
-.sub{color:#9ca3af;font-size:.8rem;margin:2px 0 10px;word-break:break-all}
-.big{font-size:2.6rem;font-weight:700;line-height:1}
-.unit{font-size:1rem;color:#9ca3af}
-.bar{height:10px;border-radius:5px;background:#374151;overflow:hidden;margin:6px 0}
-.bar>i{display:block;height:100%;border-radius:5px;transition:width .4s,background .4s}
-.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600;margin:4px 4px 0 0}
-.pill.on{background:#064e3b;color:#34d399}.pill.off{background:#7f1d1d;color:#fca5a5}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.stale{opacity:.4}
-.warn{background:#7f1d1d;color:#fecaca;padding:8px 12px;border-radius:8px;margin:8px 0;max-width:560px;display:none}
-</style></head><body>
-<h1>FAN Controller &mdash; Power/Climatizaci&oacute;n</h1>
-<div class="sub" id="sub">&nbsp;</div>
-<div class="warn" id="warn">Sin conexi&oacute;n con el dispositivo &mdash; mostrando el &uacute;ltimo dato</div>
-<div class="card" id="st">Cargando estado...</div>
-<div class="card"><h2>Configuraci&oacute;n</h2>
-<form method="POST" action="/api/config">
-<label>WiFi SSID</label><input name="wifiSsid" value="%WIFISSID%">
-<label>WiFi Password</label><input name="wifiPass" type="password" placeholder="(sin cambio)">
-<label>MQTT Server</label><input name="mqttServer" value="%MQTTSERVER%">
-<label>MQTT Port</label><input name="mqttPort" type="number" value="%MQTTPORT%">
-<label>MQTT User</label><input name="mqttUser" value="%MQTTUSER%">
-<label>MQTT Password</label><input name="mqttPass" type="password" placeholder="(sin cambio)">
-<label>Operador</label><select name="mqttOper">%OPEROPTS%</select>
-<label>Ciudad</label><input name="mqttCity" value="%MQTTCITY%">
-<label>Sitio / RBS (la MAC se a&ntilde;ade sola)</label><input name="mqttSite" value="%MQTTSITE%">
-<label>Subsistema</label><select name="mqttSubsys">%SUBSYSOPTS%</select>
-<label>Temp alta &deg;C (PWM 100%)</label><input name="highTemp" type="number" step="0.5" value="%HIGHTEMP%">
-<label>Temp baja &deg;C (PWM 0%)</label><input name="lowTemp" type="number" step="0.5" value="%LOWTEMP%">
-<label>Zona horaria</label><select name="tzOffset">%TZOPTS%</select>
-<label>Password del portal</label><input name="webPass" type="password" placeholder="(sin cambio)">
+:root{
+--bg:#0b111f;--bg2:#0e1626;--card:#141d30;--card2:#1a2540;--line:#243149;
+--txt:#e6edf7;--mut:#8896ac;--accent:#38bdf8;--accent2:#2563eb;
+--ok:#34d399;--warn:#fbbf24;--bad:#f87171}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+background:radial-gradient(1200px 600px at 50% -10%,#16223b 0%,var(--bg) 60%);
+color:var(--txt);margin:0;padding:0;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:18px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;
+flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:11px;flex:0 0 auto;
+background:linear-gradient(145deg,var(--accent),var(--accent2));
+display:grid;place-items:center;box-shadow:0 6px 18px rgba(37,99,235,.35)}
+.logo svg{width:22px;height:22px;fill:#fff}
+.brand h1{font-size:1.05rem;font-weight:700;margin:0;letter-spacing:.2px}
+.brand p{margin:2px 0 0;font-size:.74rem;color:var(--mut);letter-spacing:.6px;text-transform:uppercase}
+.conn{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--mut);
+background:var(--card);border:1px solid var(--line);padding:7px 12px;border-radius:999px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mut);flex:0 0 auto}
+.dot.live{background:var(--ok);box-shadow:0 0 0 4px rgba(52,211,153,.15);animation:pulse 2s infinite}
+.dot.dead{background:var(--bad);box-shadow:0 0 0 4px rgba(248,113,113,.15)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.tag{font-size:.72rem;color:var(--txt);background:var(--card);border:1px solid var(--line);
+padding:4px 10px;border-radius:6px}
+.tag b{color:var(--accent);font-weight:600;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+.grid.full{grid-template-columns:1fr}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.metric .lab{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.metric .val{font-size:1.7rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.metric .val small{font-size:.85rem;font-weight:600;color:var(--mut);margin-left:3px}
+.metric .sub{font-size:.74rem;color:var(--mut);margin-top:2px}
+.span2{grid-column:span 2}
+.bar{height:8px;border-radius:999px;background:var(--bg2);overflow:hidden;margin-top:10px;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;width:0;border-radius:999px;transition:width .5s ease,background .5s ease}
+.duo{display:flex;gap:16px}
+.duo>div{flex:1}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;font-weight:700;
+padding:5px 12px;border-radius:999px}
+.badge.ok{color:var(--ok);background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3)}
+.badge.bad{color:var(--bad);background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3)}
+.badge.n{color:var(--txt);background:rgba(136,150,172,.12);border:1px solid var(--line)}
+.spark{width:100%;height:56px;display:block;margin-top:8px}
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:16px}
+section>h2{font-size:.95rem;color:var(--txt);margin:0 0 4px;display:flex;align-items:center;gap:8px}
+section>h2 svg{width:16px;height:16px;fill:var(--accent)}
+section>.hint{font-size:.76rem;color:var(--mut);margin:0 0 12px}
+.fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 14px}
+.f-full{grid-column:1/-1}
+label{display:block;margin:6px 0 3px;font-size:.76rem;color:var(--mut);font-weight:600}
+input,select{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);
+background:var(--bg2);color:var(--txt);font-size:.9rem;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.15)}
+input[type=file]{padding:8px;color:var(--mut)}
+button{margin-top:16px;padding:11px 18px;border:0;border-radius:10px;font-size:.9rem;
+background:linear-gradient(145deg,var(--accent),var(--accent2));color:#fff;font-weight:700;
+cursor:pointer;width:100%;transition:filter .15s,transform .05s}
+button:hover{filter:brightness(1.08)}button:active{transform:translateY(1px)}
+small{color:var(--mut);font-size:.74rem}
+.stale{opacity:.5;filter:saturate(.4)}
+@media(max-width:520px){.grid{grid-template-columns:1fr}.span2{grid-column:auto}.fgrid{grid-template-columns:1fr}
+.metric .val{font-size:1.45rem}}
+</style></head><body><div class="wrap">
+<header>
+<div class="brand">
+<div class="logo"><svg viewBox="0 0 24 24"><path d="M12 12a2 2 0 100-4 2 2 0 000 4zm0-1.2a.8.8 0 110-1.6.8.8 0 010 1.6zM12 2c1.9 0 3 1.6 2.7 3.9 1.9-.6 3.6.2 4 2 .4 1.7-.7 3.2-2.9 3.7 1.6 1.2 1.8 3 .8 4.4-1 1.4-2.9 1.4-4.6 0 .3 2.3-.8 3.9-2 3.9s-2.3-1.6-2-3.9c-1.7 1.4-3.6 1.4-4.6 0-1-1.4-.8-3.2.8-4.4C2 11.1.9 9.6 1.3 7.9c.4-1.8 2.1-2.6 4-2C4.9 3.6 6 2 8 2c1.3 0 2.2 1.2 2.4 2.9C10.7 3.2 11.3 2 12 2z"/></svg></div>
+<div><h1>FAN Controller</h1><p>Power &middot; Climatizaci&oacute;n</p></div>
+</div>
+<div class="conn"><span class="dot" id="dot"></span><span id="connTxt">Conectando&hellip;</span></div>
+</header>
+<div class="tags">
+<span class="tag"><b>Op</b> %MQTTOPER%</span>
+<span class="tag"><b>Ciudad</b> %MQTTCITY%</span>
+<span class="tag"><b>Sitio</b> %MQTTSITE%</span>
+<span class="tag"><b>Subsist</b> %MQTTSUBSYS%</span>
+</div>
+
+<div id="st">
+<div class="grid">
+<div class="metric span2">
+<div class="lab">Temperatura del gabinete</div>
+<div class="val" id="mTemp">--<small>&deg;C</small></div>
+<div class="sub" id="mTempSub">Rango %LOWTEMP%&ndash;%HIGHTEMP% &deg;C</div>
+<div class="bar"><i id="bTemp"></i></div>
+<canvas class="spark" id="spark"></canvas>
+</div>
+<div class="metric span2">
+<div class="lab">Velocidad de ventiladores (PWM)</div>
+<div class="duo">
+<div><div class="sub">FAN 1</div><div class="val" id="mF1">--<small>%</small></div><div class="bar"><i id="bF1"></i></div></div>
+<div><div class="sub">FAN 2</div><div class="val" id="mF2">--<small>%</small></div><div class="bar"><i id="bF2"></i></div></div>
+</div>
+</div>
+<div class="metric"><div class="lab">Puerta</div><div id="mDoor"><span class="badge n">&mdash;</span></div></div>
+<div class="metric"><div class="lab">Sensor de temperatura</div><div id="mTA"><span class="badge n">&mdash;</span></div></div>
+<div class="metric"><div class="lab">Ventiladores / Alarma</div><div id="mFA"><span class="badge n">&mdash;</span></div></div>
+<div class="metric"><div class="lab">Se&ntilde;al WiFi</div><div class="val" id="mRssi">--<small>dBm</small></div><div class="sub" id="mRssiSub">&nbsp;</div></div>
+<div class="metric"><div class="lab">Tiempo activo</div><div class="val" id="mUp" style="font-size:1.25rem">--</div></div>
+<div class="metric"><div class="lab">Firmware</div><div class="val" id="mVer" style="font-size:1.25rem">--</div></div>
+</div>
+</div>
+
+<section><h2><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.9 5-.7 1.3 1.3 1.6-1.9 1.9-1.6-1.3-1.3.7-.3 2h-2.7l-.3-2-1.3-.7-1.6 1.3-1.9-1.9 1.3-1.6-.7-1.3-2-.3v-2.7l2-.3.7-1.3-1.3-1.6 1.9-1.9 1.6 1.3 1.3-.7.3-2h2.7l.3 2 1.3.7 1.6-1.3 1.9 1.9-1.3 1.6.7 1.3 2 .3v2.7l-2 .3z"/></svg>Configuraci&oacute;n</h2>
+<p class="hint">Al guardar, el dispositivo se reinicia para aplicar los cambios.</p>
+<form method="POST" action="/api/config"><div class="fgrid">
+<div><label>WiFi SSID</label><input name="wifiSsid" value="%WIFISSID%"></div>
+<div><label>WiFi Password</label><input name="wifiPass" type="password" placeholder="(sin cambio)"></div>
+<div><label>MQTT Server</label><input name="mqttServer" value="%MQTTSERVER%"></div>
+<div><label>MQTT Port</label><input name="mqttPort" type="number" value="%MQTTPORT%"></div>
+<div><label>MQTT User</label><input name="mqttUser" value="%MQTTUSER%"></div>
+<div><label>MQTT Password</label><input name="mqttPass" type="password" placeholder="(sin cambio)"></div>
+<div><label>Operador</label><select name="mqttOper">%OPEROPTS%</select></div>
+<div><label>Ciudad</label><input name="mqttCity" value="%MQTTCITY%"></div>
+<div class="f-full"><label>Sitio / RBS (la MAC se a&ntilde;ade sola)</label><input name="mqttSite" value="%MQTTSITE%"></div>
+<div><label>Subsistema</label><select name="mqttSubsys">%SUBSYSOPTS%</select></div>
+<div><label>Zona horaria</label><select name="tzOffset">%TZOPTS%</select></div>
+<div><label>Temp alta &deg;C (PWM 100%)</label><input name="highTemp" type="number" step="0.5" value="%HIGHTEMP%"></div>
+<div><label>Temp baja &deg;C (PWM 0%)</label><input name="lowTemp" type="number" step="0.5" value="%LOWTEMP%"></div>
+<div class="f-full"><label>Password del portal</label><input name="webPass" type="password" placeholder="(sin cambio)"></div>
+</div>
 <button type="submit">Guardar y reiniciar</button>
-<br><small>Usuario del portal: admin</small></form></div>
-<div class="card"><h2>Firmware OTA</h2>
+<br><small>Usuario del portal: <b>admin</b></small></form></section>
+
+<section><h2><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6z"/></svg>Firmware OTA</h2>
+<p class="hint">Sube el <b>firmware.bin</b> generado por el CI. El equipo se reinicia al terminar.</p>
 <form method="POST" action="/update" enctype="multipart/form-data">
 <input type="file" name="firmware" accept=".bin">
-<button type="submit">Actualizar firmware</button>
-<br><small>Sube el firmware.bin generado por el CI</small></form></div>
+<button type="submit">Actualizar firmware</button></form></section>
+</div>
 <script>
-var hist=[];
-function tcol(t,lo,hi){return t>=hi?'#f87171':(t>=hi-3?'#fbbf24':'#34d399');}
-function spark(){
- if(hist.length<2)return'';
- var w=280,h=38,mn=Math.min.apply(null,hist),mx=Math.max.apply(null,hist);
- if(mx-mn<1)mx=mn+1;
- var p=hist.map(function(v,i){return(i*w/(hist.length-1)).toFixed(1)+','+(h-(v-mn)/(mx-mn)*h).toFixed(1);}).join(' ');
- return'<svg width="100%" height="38" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><polyline fill="none" stroke="#60a5fa" stroke-width="2" points="'+p+'"/></svg>';
-}
-function pill(on,t){return'<span class="pill '+(on?'on':'off')+'">'+t+'</span>';}
-async function poll(){
- var st=document.getElementById('st');
- try{
-  const r=await fetch('/api/status');const d=await r.json();
-  document.getElementById('warn').style.display='none';st.classList.remove('stale');
-  if(d.node)document.getElementById('sub').textContent=d.node;
-  var t=d.temp,tok=(t!=null&&!isNaN(t));
-  if(tok){hist.push(t);if(hist.length>60)hist.shift();}
-  var lo=(d.lowT!=null?d.lowT:24),hi=(d.highT!=null?d.highT:43);
-  var pct=tok?Math.max(0,Math.min(100,(t-lo)/(hi-lo)*100)):0;
-  var col=tok?tcol(t,lo,hi):'#9ca3af';
-  st.innerHTML=
-   '<div class="big" style="color:'+col+'">'+(tok?t.toFixed(1):'--')+'<span class="unit"> &deg;C</span></div>'+
-   '<div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div>'+
-   '<small>rango '+lo.toFixed(0)+'&ndash;'+hi.toFixed(0)+' &deg;C</small>'+spark()+
-   '<div class="grid" style="margin-top:12px">'+
-    '<div><small>FAN1</small><div class="bar"><i style="width:'+d.pwm1+'%;background:#60a5fa"></i></div><b>'+d.pwm1.toFixed(0)+'%</b></div>'+
-    '<div><small>FAN2</small><div class="bar"><i style="width:'+d.pwm2+'%;background:#60a5fa"></i></div><b>'+d.pwm2.toFixed(0)+'%</b></div>'+
-   '</div>'+
-   '<div style="margin-top:10px">'+
-    pill(!d.tempAlarm,d.tempAlarm?'Sensor ALARMA':'Sensor OK')+
-    pill(!d.fanAlarm,d.fanAlarm?'FANs ALARMA':'FANs OK')+
-    pill(!d.door,d.door?'Puerta ABIERTA':'Puerta cerrada')+
-    pill(d.mqtt,d.mqtt?'MQTT conectado':'MQTT sin conexion')+
-   '</div>'+
-   '<div class="row" style="margin-top:12px"><span>WiFi</span><span>'+d.rssi+' dBm</span></div>'+
-   '<div class="row"><span>Uptime</span><span>'+d.uptime+'</span></div>'+
-   '<div class="row"><span>Firmware</span><span>v'+d.version+'</span></div>';
- }catch(e){
-  st.classList.add('stale');document.getElementById('warn').style.display='block';
+var LOW=%LOWTEMP%,HIGH=%HIGHTEMP%,hist=[],fail=0;
+function col(t){if(t>=HIGH)return getComputedStyle(document.documentElement).getPropertyValue('--bad');
+if(t>=HIGH-3)return getComputedStyle(document.documentElement).getPropertyValue('--warn');
+if(t<=LOW)return getComputedStyle(document.documentElement).getPropertyValue('--accent');
+return getComputedStyle(document.documentElement).getPropertyValue('--ok')}
+function clamp(v){return v<0?0:v>100?100:v}
+function badge(alm){return alm?'<span class="badge bad">&#9888; ALARMA</span>':'<span class="badge ok">&#10003; OK</span>'}
+function drawSpark(){var c=document.getElementById('spark');if(!c)return;
+var w=c.clientWidth,h=56;c.width=w;c.height=h;var x=c.getContext('2d');x.clearRect(0,0,w,h);
+if(hist.length<2)return;var lo=Math.min.apply(0,hist),hi=Math.max.apply(0,hist);
+if(hi-lo<1){hi=lo+1}var pad=6,gw=w,gh=h-pad*2;
+x.beginPath();for(var i=0;i<hist.length;i++){var px=i/(hist.length-1)*gw,
+py=pad+gh-(hist[i]-lo)/(hi-lo)*gh;i?x.lineTo(px,py):x.moveTo(px,py)}
+x.strokeStyle=col(hist[hist.length-1]).trim();x.lineWidth=2;x.lineJoin='round';x.stroke();
+x.lineTo(gw,h);x.lineTo(0,h);x.closePath();
+var g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(56,189,248,.22)');
+g.addColorStop(1,'rgba(56,189,248,0)');x.fillStyle=g;x.fill()}
+function setLive(ok){var d=document.getElementById('dot'),t=document.getElementById('connTxt'),
+s=document.getElementById('st');d.className='dot '+(ok?'live':'dead');
+t.textContent=ok?'En vivo &middot; act. 2 s':'Sin conexi\u00f3n';
+t.innerHTML=ok?'En vivo &middot; actualizado ahora':'Sin conexi\u00f3n \u2014 dato antiguo';
+s.className=ok?'':'stale'}
+async function poll(){try{
+ var r=await fetch('/api/status');var d=await r.json();fail=0;setLive(true);
+ var t=d.temp,tok=(t!=null&&!isNaN(t));
+ if(tok){
+  document.getElementById('mTemp').innerHTML=t.toFixed(1)+'<small>&deg;C</small>';
+  var c=col(t).trim();document.getElementById('mTemp').style.color=c;
+  var bt=document.getElementById('bTemp');bt.style.width=clamp((t-LOW)/(HIGH-LOW)*100)+'%';bt.style.background=c;
+  document.getElementById('mTempSub').textContent=t>=HIGH?'Sobre l\u00edmite alto':(t<=LOW?'Bajo l\u00edmite':'En rango '+LOW+'\u2013'+HIGH+' \u00b0C');
+  hist.push(t);if(hist.length>60)hist.shift();drawSpark();
+ }else{
+  document.getElementById('mTemp').innerHTML='--<small>&deg;C</small>';
+  document.getElementById('mTemp').style.color=getComputedStyle(document.documentElement).getPropertyValue('--bad').trim();
+  document.getElementById('bTemp').style.width='0%';
+  document.getElementById('mTempSub').textContent='Sensor sin lectura';
  }
-}
-poll();setInterval(poll,2000);
+ var p1=d.pwm1,p2=d.pwm2;
+ document.getElementById('mF1').innerHTML=p1.toFixed(0)+'<small>%</small>';
+ document.getElementById('mF2').innerHTML=p2.toFixed(0)+'<small>%</small>';
+ var b1=document.getElementById('bF1'),b2=document.getElementById('bF2');
+ b1.style.width=clamp(p1)+'%';b2.style.width=clamp(p2)+'%';
+ b1.style.background=b2.style.background=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+ document.getElementById('mDoor').innerHTML=d.door?'<span class="badge bad">Abierta</span>':'<span class="badge ok">Cerrada</span>';
+ var sensorFail=(!tok||d.tempCode=='Sensor Failure'||d.tempCode=='Disconnected');
+ document.getElementById('mTA').innerHTML=sensorFail?'<span class="badge bad">&#9888; FALLA</span>':'<span class="badge ok">&#10003; OK</span>';
+ document.getElementById('mFA').innerHTML=badge(d.fanAlarm);
+ var rs=d.rssi;document.getElementById('mRssi').innerHTML=rs+'<small>dBm</small>';
+ document.getElementById('mRssiSub').textContent=rs>=-60?'Excelente':(rs>=-70?'Buena':(rs>=-80?'Regular':'D\u00e9bil'));
+ document.getElementById('mUp').textContent=d.uptime;
+ document.getElementById('mVer').textContent='v'+d.version;
+}catch(e){if(++fail>=2)setLive(false)}}
+poll();setInterval(poll,2000);window.addEventListener('resize',drawSpark);
 </script></body></html>
 )HTML";
 
@@ -168,6 +262,11 @@ private:
         page.replace("%LOWTEMP%",    String(_store->cfg.lowTemp, 1));
         page.replace("%MQTTCITY%",   _store->cfg.mqttCity);
         page.replace("%MQTTSITE%",   _store->cfg.mqttSite);
+        /*Device-identity tags shown in the dashboard header so the operator
+        knows which board of the fleet they are looking at (static config,
+        no /api/status change needed).*/
+        page.replace("%MQTTOPER%",   _store->cfg.mqttOperator);
+        page.replace("%MQTTSUBSYS%", _store->cfg.mqttSubsystem);
         static const char* const opers[]  = {"claro","cnt","tigo"};
         static const char* const subsys[] = {"power","generador","baterias","seguridad"};
         page.replace("%OPEROPTS%",   _selectOpts(opers, 3, _store->cfg.mqttOperator));

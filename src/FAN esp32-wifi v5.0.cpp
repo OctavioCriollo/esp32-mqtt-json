@@ -256,6 +256,7 @@ void setup(){
       doc["pwm2"]      = speedFan2.value();
       doc["door"]      = (bool)doorOpenMon.readPin();
       doc["tempAlarm"] = (bool)temp1.status.alm();
+      doc["tempCode"]  = temp1.status.code();   /*OK/High Temperature/Low.../Sensor Failure*/
       doc["fanAlarm"]  = (bool)fanAlarm.status.alm();
       xSemaphoreGive(stateMutex);
     }

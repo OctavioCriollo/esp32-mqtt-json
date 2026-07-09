@@ -94,7 +94,8 @@ button:hover{filter:brightness(1.08)}button:active{transform:translateY(1px)}
 small{color:var(--mut);font-size:.74rem}
 .stale{opacity:.5;filter:saturate(.4)}
 @media(max-width:520px){.grid{grid-template-columns:1fr}.span2{grid-column:auto}.fgrid{grid-template-columns:1fr}
-.metric .val{font-size:1.45rem}}
+.metric .val{font-size:1.45rem}
+header{justify-content:center;text-align:center}.brand{justify-content:center}.conn{margin:0 auto}.tags{justify-content:center}}
 </style></head><body><div class="wrap">
 <header>
 <div class="brand">
@@ -108,6 +109,7 @@ small{color:var(--mut);font-size:.74rem}
 <span class="tag"><b>Ciudad</b> %MQTTCITY%</span>
 <span class="tag"><b>Sitio</b> %MQTTSITE%</span>
 <span class="tag"><b>Subsist</b> %MQTTSUBSYS%</span>
+<span class="tag"><b>Client ID</b> %CLIENTID%</span>
 </div>
 
 <div id="st">
@@ -267,6 +269,11 @@ private:
         no /api/status change needed).*/
         page.replace("%MQTTOPER%",   _store->cfg.mqttOperator);
         page.replace("%MQTTSUBSYS%", _store->cfg.mqttSubsystem);
+        /*Client ID = site-MAC-subsystem, the same value the main builds for
+        the MQTT client; the MAC makes it the unique device identity.*/
+        String _mac = WiFi.macAddress(); _mac.replace(":", "");
+        page.replace("%CLIENTID%", String(_store->cfg.mqttSite) + "-" + _mac +
+                                   "-" + _store->cfg.mqttSubsystem);
         static const char* const opers[]  = {"claro","cnt","tigo"};
         static const char* const subsys[] = {"power","generador","baterias","seguridad"};
         page.replace("%OPEROPTS%",   _selectOpts(opers, 3, _store->cfg.mqttOperator));

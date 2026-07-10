@@ -274,7 +274,8 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <form method="POST" action="/update" enctype="multipart/form-data">
 <input type="file" name="firmware" accept=".bin">
 <button type="submit">Save and Restart</button></form>
-<p class="hint" style="text-align:center;margin-top:14px">Firmware actual: <b id="mVer" style="color:var(--txt)">v--</b> &middot; se actualiza solo al flashear una versi&oacute;n nueva</p>
+<div class="sub" id="otaLine" style="text-align:center;min-height:1.1em;margin-top:8px">&nbsp;</div>
+<p class="hint" style="text-align:center;margin-top:8px">Firmware actual: <b id="mVer" style="color:var(--txt)">v--</b> &middot; se actualiza solo al flashear una versi&oacute;n nueva</p>
 </section>
 </div>
 
@@ -300,6 +301,14 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <div class="spinner"></div>
 <h3>Guardado &#10003;</h3>
 <p id="saveMsg">Reiniciando el dispositivo&hellip;</p>
+</div>
+</div>
+
+<div class="modal" id="otaModal">
+<div class="modal-card" style="text-align:center">
+<div class="spinner"></div>
+<h3>Actualizando firmware</h3>
+<p id="otaMsg">Subiendo&hellip;</p>
 </div>
 </div>
 
@@ -341,12 +350,16 @@ function setLive(ok){var d=document.getElementById('dot'),t=document.getElementB
 s=document.getElementById('pane-tele');d.className='dot '+(ok?'live':'dead');
 t.textContent=ok?'Online':'Offline';
 s.className='tabpane'+(s.classList.contains('active')?' active':'')+(ok?'':' stale')}
-document.querySelectorAll('.tabbtn').forEach(function(b){b.onclick=function(){
- document.querySelectorAll('.tabbtn').forEach(function(x){x.classList.remove('active')});
+function showTab(name){
+ document.querySelectorAll('.tabbtn').forEach(function(x){x.classList.toggle('active',x.dataset.tab===name)});
  document.querySelectorAll('.tabpane').forEach(function(x){x.classList.remove('active')});
- b.classList.add('active');document.getElementById('pane-'+b.dataset.tab).classList.add('active');
- if(b.dataset.tab=='tele')drawSpark();
-};});
+ var p=document.getElementById('pane-'+name);if(p)p.classList.add('active');
+ if(name=='tele')drawSpark();}
+document.querySelectorAll('.tabbtn').forEach(function(b){b.onclick=function(){
+ try{localStorage.setItem('tab',b.dataset.tab)}catch(e){}
+ showTab(b.dataset.tab);};});
+(function(){var t;try{t=localStorage.getItem('tab')}catch(e){}   /*restore last tab after a reboot/reload*/
+ if(t&&document.getElementById('pane-'+t))showTab(t);})();
 var fanLogic=0,FANV=['or','and','f1','f2'];   /*index = stored logic value*/
 function openFan(){document.querySelectorAll('#fanModal .opt').forEach(function(o){
  o.classList.toggle('sel',o.getAttribute('data-v')===FANV[fanLogic]);});
@@ -401,6 +414,27 @@ document.querySelectorAll('form[action="/api/config"]').forEach(function(f){f.on
   },4000);
  }).catch(function(e){alert((''+e)||'Error al guardar');});
  return false;};});
+function otaMsg2(txt,cvar){var m=document.getElementById('otaLine');
+ m.textContent=txt;m.style.color=css(cvar).trim();m.style.opacity='1';}
+var _ota=document.querySelector('form[action="/update"]');
+if(_ota)_ota.onsubmit=function(){
+ document.getElementById('otaLine').innerHTML='&nbsp;';   /*limpia el resultado anterior al reintentar*/
+ var fi=_ota.querySelector('input[type=file]');
+ if(!fi.files.length){otaMsg2('Elige primero un archivo .bin','--warn');return false;}
+ var mod=document.getElementById('otaModal'),mm=document.getElementById('otaMsg');
+ mm.textContent='Subiendo… 0%';mod.classList.add('open');
+ var x=new XMLHttpRequest();x.open('POST','/update');
+ x.upload.onprogress=function(e){if(e.lengthComputable)mm.textContent='Subiendo… '+Math.round(e.loaded/e.total*100)+'%';};
+ x.onload=function(){mod.classList.remove('open');
+  if(x.status===200){otaMsg2('Firmware cargado ✓ · reiniciando…','--ok');
+   var t0=Date.now();(function ping(){fetch('/api/status',{cache:'no-store'}).then(function(rr){
+    if(!rr.ok)throw 0;location.href='/';}).catch(function(){
+    if(Date.now()-t0>30000)otaMsg2('El equipo tarda; recarga la página manualmente.','--warn');
+    else setTimeout(ping,1500);});})();
+  }else{otaMsg2('No se pudo actualizar (código '+x.status+'). Revisa el .bin.','--bad');}};
+ x.onerror=function(){mod.classList.remove('open');otaMsg2('Error de red durante la subida.','--bad');};
+ x.send(new FormData(_ota));
+ return false;};
 function thrMsg(txt,cvar){var m=document.getElementById('thrMsg');
  m.textContent=txt;m.style.color=css(cvar).trim();
  m.style.transition='none';m.style.opacity='1';void m.offsetWidth;   /*reflow: reset instantly*/
@@ -415,6 +449,7 @@ function setThr(){var lo=document.getElementById('inLow').value,hi=document.getE
  }).catch(function(e){thrMsg((''+e)||'Error','--bad');});}
 async function poll(){try{
  var r=await fetch('/api/status');var d=await r.json();fail=0;setLive(true);
+ if(!('temp' in d))return;   /*partial snapshot (state lock busy this poll): keep last values, avoid a false "disconnected" flash*/
  var t=d.temp,tok=(t!=null&&!isNaN(t));
  if(tok){
   document.getElementById('mTemp').innerHTML=t.toFixed(2)+'<small>&deg;C</small>';

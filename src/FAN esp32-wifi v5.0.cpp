@@ -147,16 +147,21 @@ void setup(){
   operator/city/site-MAC/subsystem/{telemetria,control}. The device MAC is
   appended to the site, so it is globally unique; one firmware serves the
   whole fleet and wildcard ACLs work (e.g. claro/+/+/power/telemetria).*/
-  String mac = WiFi.macAddress(); mac.replace(":", "");
+  String mac = WiFi.macAddress(); mac.replace(":", "");   /*uppercase hex*/
   String siteId = String(configStore.cfg.mqttSite) + "-" + mac;
+  /*Topics are forced to lowercase (MQTT convention) regardless of how the
+  identity is typed in Device Info, so subscribers/ACLs have one stable case.*/
   String topicBase = String(configStore.cfg.mqttOperator) + "/" +
                      configStore.cfg.mqttCity + "/" + siteId + "/" +
                      configStore.cfg.mqttSubsystem;
+  topicBase.toLowerCase();
   mqtt_topic_pub = topicBase + "/telemetria";
   mqtt_topic_sub = topicBase + "/control";
   mqtt.setTopicPUB(mqtt_topic_pub.c_str());
   mqtt.setTopicSUB(mqtt_topic_sub.c_str());
-  mqtt_ID = siteId + "-" + configStore.cfg.mqttSubsystem;
+  /*Client ID = site-MAC only (site keeps its typed case, MAC uppercase); the
+  subsystem is dropped because it already lives in the topic path.*/
+  mqtt_ID = siteId;
   mqtt.setId(mqtt_ID.c_str());
 
   if(wifi_connect(ssid,password,WIFI_BOOT_ATTEMPTS)){

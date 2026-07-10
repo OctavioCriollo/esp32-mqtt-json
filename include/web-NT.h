@@ -35,6 +35,7 @@ Design notes:
 #include <ESPmDNS.h>
 #include <Update.h>
 #include <ArduinoJson.h>
+#include <esp_mac.h>
 #include "config-NT.h"
 
 static const char PORTAL_HTML[] PROGMEM = R"HTML(
@@ -288,7 +289,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <div class="opt" data-v="f1"><span class="rd"></span>Only FAN1</div>
 <div class="opt" data-v="f2"><span class="rd"></span>Only FAN2</div>
 <div class="mrow">
-<button onclick="closeFan()">Set</button>
+<button onclick="fanSet()">Set</button>
 <button onclick="closeFan()" style="background:none;border:1px solid var(--line);color:var(--mut)">Cancel</button>
 </div>
 </div>
@@ -346,13 +347,22 @@ document.querySelectorAll('.tabbtn').forEach(function(b){b.onclick=function(){
  b.classList.add('active');document.getElementById('pane-'+b.dataset.tab).classList.add('active');
  if(b.dataset.tab=='tele')drawSpark();
 };});
-function openFan(){document.getElementById('fanModal').classList.add('open')}
+var fanLogic=0,FANV=['or','and','f1','f2'];   /*index = stored logic value*/
+function openFan(){document.querySelectorAll('#fanModal .opt').forEach(function(o){
+ o.classList.toggle('sel',o.getAttribute('data-v')===FANV[fanLogic]);});
+ document.getElementById('fanModal').classList.add('open')}
 function closeFan(){document.getElementById('fanModal').classList.remove('open')}
+function fanSet(){var s=document.querySelector('#fanModal .opt.sel');
+ var v=s?FANV.indexOf(s.getAttribute('data-v')):0;if(v<0)v=0;
+ var b=new URLSearchParams();b.append('logic',v);
+ fetch('/api/fanlogic',{method:'POST',body:b}).then(function(r){if(r.ok)fanLogic=v;});
+ closeFan();}
 document.querySelectorAll('.opt').forEach(function(o){o.onclick=function(){
  document.querySelectorAll('.opt').forEach(function(x){x.classList.remove('sel')});o.classList.add('sel');
 };});
-var ACTS=[['','— free'],['speedFan1','speedFan1'],['speedFan2','speedFan2'],['doorOpenAlarm','doorOpenAlarm'],['fanAlarm','fanAlarm']];
-var outMap=['speedFan1','speedFan2','doorOpenAlarm','fanAlarm'],outEdit=-1,outPick='';
+var ACTS=[['','— free'],['tempAlarm','tempAlarm'],['doorOpenAlarm','doorOpenAlarm'],['fanAlarm','fanAlarm']];
+var NUMSIG=['','tempAlarm','doorOpenAlarm','fanAlarm'];   /*numeric relayMap -> name*/
+var outMap=['doorOpenAlarm','fanAlarm','tempAlarm',''],outEdit=-1,outPick='';
 function outText(v){return v===''?'— free':v}
 function outRender(){for(var i=0;i<4;i++)document.getElementById('ov'+i).textContent=outText(outMap[i]);}
 function openOut(i){outEdit=i;outPick=outMap[i];
@@ -367,7 +377,10 @@ function openOut(i){outEdit=i;outPick=outMap[i];
   o.classList.add('sel');outPick=o.getAttribute('data-v');};});
  document.getElementById('outModal').classList.add('open');}
 function outClose(){document.getElementById('outModal').classList.remove('open')}
-function outSet(){outMap[outEdit]=outPick;outRender();outClose();}
+function outSet(){outMap[outEdit]=outPick;outRender();
+ var b=new URLSearchParams();for(var i=0;i<4;i++)b.append('r'+i,NUMSIG.indexOf(outMap[i]));
+ fetch('/api/relays',{method:'POST',body:b});
+ outClose();}
 document.getElementById('outModal').onclick=function(e){if(e.target===this)outClose();};
 document.querySelectorAll('.orow2').forEach(function(r){r.onclick=function(){openOut(+r.getAttribute('data-out'));};});
 outRender();
@@ -388,13 +401,18 @@ document.querySelectorAll('form[action="/api/config"]').forEach(function(f){f.on
   },4000);
  }).catch(function(e){alert((''+e)||'Error al guardar');});
  return false;};});
+function thrMsg(txt,cvar){var m=document.getElementById('thrMsg');
+ m.textContent=txt;m.style.color=css(cvar).trim();
+ m.style.transition='none';m.style.opacity='1';void m.offsetWidth;   /*reflow: reset instantly*/
+ m.style.transition='opacity 1s ease';
+ clearTimeout(m._h);m._h=setTimeout(function(){m.style.opacity='0';},4000);}   /*fade out, gone ~5s*/
 function setThr(){var lo=document.getElementById('inLow').value,hi=document.getElementById('inHigh').value;
- var m=document.getElementById('thrMsg');var b=new URLSearchParams();b.append('lowTemp',lo);b.append('highTemp',hi);
+ var b=new URLSearchParams();b.append('lowTemp',lo);b.append('highTemp',hi);
  fetch('/api/thresholds',{method:'POST',body:b}).then(function(r){
   if(!r.ok)return r.text().then(function(t){throw t});return r.json();}).then(function(j){
   LOW=parseFloat(j.lowT);HIGH=parseFloat(j.highT);
-  m.textContent='Guardado ✓ ('+LOW+'–'+HIGH+' °C)';m.style.color=css('--ok').trim();
- }).catch(function(e){m.textContent=(''+e)||'Error';m.style.color=css('--bad').trim();});}
+  thrMsg('Guardado ✓ ('+LOW+'–'+HIGH+' °C)','--ok');
+ }).catch(function(e){thrMsg((''+e)||'Error','--bad');});}
 async function poll(){try{
  var r=await fetch('/api/status');var d=await r.json();fail=0;setLive(true);
  var t=d.temp,tok=(t!=null&&!isNaN(t));
@@ -427,7 +445,11 @@ async function poll(){try{
  document.getElementById('mR2').textContent=(d.fan2Rpm||0).toFixed(0)+' rpm';
  document.getElementById('aF1').innerHTML=badge(d.fan1Alarm);
  document.getElementById('aF2').innerHTML=badge(d.fan2Alarm);
- document.getElementById('aFG').className='bulb'+((d.fan1Alarm||d.fan2Alarm)?' on':'');
+ if(d.fanLogic!=null)fanLogic=d.fanLogic;
+ document.getElementById('aFG').className='bulb'+(d.fanGeneral?' on':'');
+ if(d.relayMap&&!document.getElementById('outModal').classList.contains('open')){
+  var ch=false;for(var i=0;i<4;i++){var nm=NUMSIG[d.relayMap[i]]||'';if(outMap[i]!==nm){outMap[i]=nm;ch=true;}}
+  if(ch)outRender();}
  document.getElementById('mDoor').innerHTML=d.door?'<span class="badge bad">&#9888; OPEN</span>':'<span class="badge ok">&#10003; CLOSED</span>';
  var rs=d.rssi;document.getElementById('mRssi').innerHTML=rs+'<small>dBm</small>';
  document.getElementById('mRssiSub').textContent=rs>=-60?'Excellent':(rs>=-70?'Good':(rs>=-80?'Fair':'Weak'));
@@ -491,13 +513,20 @@ private:
         page.replace("%MQTTSUBSYS%", _store->cfg.mqttSubsystem);
         /*Client ID = site-MAC-subsystem, the same value the main builds for
         the MQTT client; the MAC makes it the unique device identity.*/
-        String _mac = WiFi.macAddress(); _mac.replace(":", "");   /*uppercase hex*/
-        String _siteId = String(_store->cfg.mqttSite) + "-" + _mac;
+        /*Factory MAC from eFuse (same source as the main), so the portal's
+        Client ID / topics match exactly what the device publishes.*/
+        uint8_t _mr[6]; esp_read_mac(_mr, ESP_MAC_WIFI_STA);
+        char _mn[13], _mc[18];
+        snprintf(_mn, sizeof(_mn), "%02X%02X%02X%02X%02X%02X",
+                 _mr[0],_mr[1],_mr[2],_mr[3],_mr[4],_mr[5]);
+        snprintf(_mc, sizeof(_mc), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 _mr[0],_mr[1],_mr[2],_mr[3],_mr[4],_mr[5]);
+        String _siteId = String(_store->cfg.mqttSite) + "-" + String(_mn);
         /*Client ID = site-MAC (site keeps its typed case, MAC uppercase); no
         subsystem here because it already lives in the topic path.*/
         page.replace("%CLIENTID%", _siteId);
         /*Raw MAC (colon form) shown read-only in the Device tab.*/
-        page.replace("%MAC%", WiFi.macAddress());
+        page.replace("%MAC%", String(_mc));
         /*Pub/sub topics shown read-only in MQTT Setup, lowercased to match the
         main's build (operator/city/site-MAC/subsystem/{telemetria,control}).*/
         String _base = String(_store->cfg.mqttOperator) + "/" + _store->cfg.mqttCity +
@@ -634,6 +663,50 @@ public:
             req->send(200, "application/json",
                       "{\"ok\":true,\"lowT\":" + String(lo, 1) +
                       ",\"highT\":" + String(hi, 1) + "}");
+        });
+
+        /*Fan-alarm logic (Fan Alarm Setup popup): 0=OR 1=AND 2=FAN1 3=FAN2.
+        Applied live (the control side reads cfg each cycle) -- no reboot.*/
+        _server.on("/api/fanlogic", HTTP_POST, [this](AsyncWebServerRequest* req){
+            if (!_auth(req)) return;
+            if (!req->hasParam("logic", true)){
+                req->send(400, "text/plain", "falta 'logic'");
+                return;
+            }
+            int v = req->getParam("logic", true)->value().toInt();
+            if (v < 0 || v > 3){
+                req->send(400, "text/plain", "logic invalido (0-3)");
+                return;
+            }
+            _store->cfg.fanAlarmLogic = (uint8_t)v;
+            if (!_store->save()){
+                req->send(500, "text/plain", "Error al guardar");
+                return;
+            }
+            req->send(200, "application/json", "{\"ok\":true,\"logic\":" + String(v) + "}");
+        });
+
+        /*Output-relay mapping (Control tab): OUT1-4 -> signal (0=free 1=temp
+        2=door 3=fan). Applied live by the control router -- no reboot.*/
+        _server.on("/api/relays", HTTP_POST, [this](AsyncWebServerRequest* req){
+            if (!_auth(req)) return;
+            uint8_t nm[4];
+            for (int i = 0; i < 4; i++){
+                String k = "r" + String(i);
+                int v = req->hasParam(k, true) ? req->getParam(k, true)->value().toInt() : 0;
+                if (v < 0 || v > 3){ req->send(400, "text/plain", "valor invalido"); return; }
+                nm[i] = (uint8_t)v;
+            }
+            /*Mutual exclusion: a non-free signal can only drive one relay.*/
+            for (int i = 0; i < 4; i++)
+                for (int j = i + 1; j < 4; j++)
+                    if (nm[i] != 0 && nm[i] == nm[j]){
+                        req->send(400, "text/plain", "exclusion mutua: una alarma en dos reles");
+                        return;
+                    }
+            for (int i = 0; i < 4; i++) _store->cfg.relayMap[i] = nm[i];
+            if (!_store->save()){ req->send(500, "text/plain", "Error al guardar"); return; }
+            req->send(200, "application/json", "{\"ok\":true}");
         });
 
         /*OTA: upload handler streams the .bin into the OTA partition.*/

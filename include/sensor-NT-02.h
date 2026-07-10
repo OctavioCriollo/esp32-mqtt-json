@@ -40,7 +40,7 @@ inline String nowIso8601(){
 #define BME180_MODEL "BME180"
 #define DTH22_MODEL "DTH22"
 #define DIGITAL_STATE_MODEL "BIT_STATE"
-#define TACHOMETER_MODEL "TACHOMETER_MODEL"
+#define TACHOMETER_MODEL "TACHOMETER"
 
 /*Actuator Models:
 =======================================*/ 
@@ -844,6 +844,12 @@ public:
     u_int8_t pin() const{
         return _pin;
     }
+    /*Reassign the output pin at runtime (configurable I/O). The state is
+    applied by the next writePin()/on()/off().*/
+    void setPin(u_int8_t pin){
+        _pin = pin;
+        pinMode(_pin, OUTPUT);
+    }
 
     /*METHOD Class PINCONTROL
     ====================================*/
@@ -935,17 +941,24 @@ public:
 
     /*CONSTRUCTOR Class Device
     ==============================================================================================*/
-    Device(const char* id, const char* platform, const char* topic): 
-    _id(id), _platform(platform), _topic(topic),
+    Device(const char* id, const char* platform):
+    _id(id),
     _label(nullptr),
+    _platform(platform),
     _MAC(nullptr),
     _IP(nullptr),
     _communication(nullptr),
     _workingMode(nullptr),
+    _topic(nullptr),
     _timestamp(DEFAULT_TIMESTAMP),
     /*sensors/actuators are default-constructed; the old init list read
     them from themselves before construction (undefined behavior).*/
-    status() {}
+    status() {
+        /*Auto-build the topic from the id, like sensors/actuators
+        (/ds18b20/temp1, /pwm/speedFan1) -> /devices/<id>. No hardcoded topic.*/
+        String str = String("/devices/") + id;
+        setTopic(str.c_str());
+    }
 
     /*GETTER atributos privados Class Device
     ========================================*/
@@ -1006,7 +1019,8 @@ public:
         _workingMode = strdup(workingMode);
     }
     void setTopic(const char* topic){
-        _topic = topic;
+        if(_topic != nullptr) free((void*)_topic);   /*strdup() -> free()*/
+        _topic = strdup(topic);
     }
     void setTimestamp(const char* timestamp){
         _timestamp = timestamp;

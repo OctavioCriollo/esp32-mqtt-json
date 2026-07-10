@@ -10,6 +10,7 @@ Copyright (c) 2023 Octavio Criollo.
 #include "IoT-NT.h"
 //#include <arduino-timer.h>   /*parked: Timer is only used by the (parked) tachometer code*/
 #include <esp_task_wdt.h>
+#include <esp_mac.h>   /*esp_read_mac(): factory MAC from eFuse, no WiFi needed*/
 
 /*PWM variables
 ==============================*/
@@ -88,7 +89,8 @@ TACHOMETER fan2(TACH_FAN_2,INPUT_PULLUP,fan_pulses_per_rev,"fan2");
 PINSTATE doorOpenMon(IN_1,INPUT_PULLUP,"doorOpenMon");
 PINCONTROL doorOpenAlarm(RELAY_OUT_1,OUTPUT,"doorOpenAlarm");
 PINCONTROL fanAlarm(RELAY_OUT_2,OUTPUT,"fanAlarm");
-Device controller("Controller",ESP_32,"/power/climatizacion");
+PINCONTROL tempAlarm(RELAY_OUT_3,OUTPUT,"tempAlarm");
+Device controller("Controller",ESP_32);
 Sensors sensors;
 Actuators actuators;
 
@@ -127,6 +129,8 @@ implementation lives after the control-cycle function below.*/
 SemaphoreHandle_t stateMutex;
 TaskHandle_t controlTaskHandle;
 void controlTask(void*);
+bool fanGeneralAlarm();   /*general fan alarm per cfg.fanAlarmLogic (0=OR/1=AND/2=FAN1/3=FAN2)*/
+void applyRelayMapping();   /*point each alarm actuator at its NVS-mapped relay*/
 
 void setup(){
   serial_setup(115200);
@@ -147,7 +151,18 @@ void setup(){
   operator/city/site-MAC/subsystem/{telemetria,control}. The device MAC is
   appended to the site, so it is globally unique; one firmware serves the
   whole fleet and wildcard ACLs work (e.g. claro/+/+/power/telemetria).*/
-  String mac = WiFi.macAddress(); mac.replace(":", "");   /*uppercase hex*/
+  /*Read the factory MAC straight from eFuse (esp_read_mac): always valid,
+  independent of WiFi init/mode/timing. Same value WiFi.macAddress() gives
+  once WiFi is up, so the topic/client-id match the STA MAC on the network.
+  (Before this, the MAC was read pre-WiFi-init and came out all-zeros.)*/
+  uint8_t macRaw[6]; esp_read_mac(macRaw, ESP_MAC_WIFI_STA);
+  char macNo[13], macCo[18];
+  snprintf(macNo, sizeof(macNo), "%02X%02X%02X%02X%02X%02X",
+           macRaw[0],macRaw[1],macRaw[2],macRaw[3],macRaw[4],macRaw[5]);
+  snprintf(macCo, sizeof(macCo), "%02X:%02X:%02X:%02X:%02X:%02X",
+           macRaw[0],macRaw[1],macRaw[2],macRaw[3],macRaw[4],macRaw[5]);
+  String mac = macNo;         /*uppercase hex, no colons — for topic/client-id*/
+  controller.setMAC(macCo);   /*colon form for the device JSON identity*/
   String siteId = String(configStore.cfg.mqttSite) + "-" + mac;
   /*Topics are forced to lowercase (MQTT convention) regardless of how the
   identity is typed in Device Info, so subscribers/ACLs have one stable case.*/
@@ -202,6 +217,9 @@ void setup(){
                   WiFi.softAPIP().toString().c_str());
   } 
 
+  /*Apply the saved relay mapping (NVS) before the first writes, so each alarm
+  starts on ITS configured relay -- not on the constructor's default pin.*/
+  applyRelayMapping();
   doorOpenAlarm.writePin(doorOpenMon.readPin());
   speedFan1.write(PWM_MAX);
   speedFan2.write(PWM_MAX);
@@ -231,6 +249,7 @@ void setup(){
   actuators.add(&speedFan2);
   actuators.add(&doorOpenAlarm);
   actuators.add(&fanAlarm);
+  actuators.add(&tempAlarm);
   controller.sensors = sensors;
   controller.actuators = actuators;
  
@@ -266,6 +285,10 @@ void setup(){
       doc["tempAlarm"] = (bool)temp1.status.alm();
       doc["tempCode"]  = temp1.status.code();   /*OK/High Temperature/Low.../Sensor Failure*/
       doc["fanAlarm"]  = (bool)fanAlarm.status.alm();
+      doc["fanGeneral"]= fanGeneralAlarm();   /*fan1/fan2 combined per configured logic*/
+      doc["fanLogic"]  = configStore.cfg.fanAlarmLogic;
+      JsonArray _rm = doc["relayMap"].to<JsonArray>();   /*OUT1-4 -> assigned signal*/
+      for(int i = 0; i < 4; i++) _rm.add(configStore.cfg.relayMap[i]);
       xSemaphoreGive(stateMutex);
     }
     doc["rssi"]    = WiFi.RSSI();
@@ -301,10 +324,44 @@ so blocking WiFi/MQTT reconnects in loop() can NEVER freeze thermal
 control. Shared device objects are guarded by stateMutex; the network
 side only holds it long enough to deep-copy a JSON snapshot.
 ==================================================================*/
+/*General fan alarm: combine fan1/fan2 status per the configured logic
+(0=OR, 1=AND, 2=only FAN1, 3=only FAN2). Drives the dashboard bulb.*/
+bool fanGeneralAlarm(){
+  bool a = fan1.status.alm(), b = fan2.status.alm();
+  switch(configStore.cfg.fanAlarmLogic){
+    case 1:  return a && b;
+    case 2:  return a;
+    case 3:  return b;
+    default: return a || b;
+  }
+}
+
+/*Relay assignment: which OUT (0-3) each alarm drives, -1 = unassigned. Applied
+by pointing each alarm actuator at its mapped relay with setPin(); re-run only
+when the map changes (free/vacated relays are driven LOW here).*/
+int g_tempOut = -1, g_doorOut = -1, g_fanOut = -1;
+void applyRelayMapping(){
+  const int relayGpio[4] = {RELAY_OUT_1, RELAY_OUT_2, RELAY_OUT_3, RELAY_OUT_4};
+  for(int i = 0; i < 4; i++){ pinMode(relayGpio[i], OUTPUT); digitalWrite(relayGpio[i], LOW); }
+  g_tempOut = g_doorOut = g_fanOut = -1;
+  for(int i = 0; i < 4; i++){
+    switch(configStore.cfg.relayMap[i]){
+      case 1: g_tempOut = i; tempAlarm.setPin(relayGpio[i]);     break;
+      case 2: g_doorOut = i; doorOpenAlarm.setPin(relayGpio[i]); break;
+      case 3: g_fanOut  = i; fanAlarm.setPin(relayGpio[i]);      break;
+    }
+  }
+}
+
 void runControlCycle(){
   /*Dynamic thresholds (item G): editable at runtime via config*/
   const float HIGH_T = configStore.cfg.highTemp;
   const float LOW_T  = configStore.cfg.lowTemp;
+  /*Keep the DS18B20's reported upper/lower in sync with the live thresholds
+  (shown in the JSON; the /api/thresholds Set updates cfg but not these).
+  Cheap float setters, safe to refresh each cycle.*/
+  temp1.setUpper(HIGH_T);
+  temp1.setLower(LOW_T);
 bool doorCabinet = doorOpenMon.readPin();
 float tempCabinet = temp1.readTemperature();
 
@@ -374,8 +431,7 @@ else{
   /*Fan-failure logic lives below (after the door block) so it is gated by
   the commanded speedFan value, not nested in the door-closed branch.*/
 }
-doorOpenAlarm.status.setAlm(doorCabinet);
-doorOpenAlarm.writePin(doorCabinet);
+doorOpenAlarm.status.setAlm(doorCabinet);   /*physical relay driven by the router below*/
 
 /*Fan RPM + failure alarm from the tachometers (fan1/fan2). Measured once
 per cycle; gated by the commanded speed so a fan intentionally off (door
@@ -393,13 +449,28 @@ if(speedFan2.value() <= 0){ fan2.status.setAlm(NOT_ALARM); fan2.status.setCode("
 else if(fan2.rpm() == 0){   fan2.status.setAlm(ALARM);     fan2.status.setCode(FAN_STOPPED); }
 else{                       fan2.status.setAlm(NOT_ALARM); fan2.status.setCode(FAN_WORKING); }
 
-/*Interim: RELAY_OUT_2 fires on any cooling problem (high temp / sensor
-fault / a stopped fan). The configurable-I/O phase will split temperature
-and fan into separate, portal-assignable relays.*/
-fanAlarm.status.setAlm(temp1.status.alm() or fan1.status.alm() or fan2.status.alm());
-fanAlarm.writePin(not (temp1.status.alm() or fan1.status.alm() or fan2.status.alm()));
-if(fanAlarm.status.alm())  fanAlarm.status.setCode("Cooling Alarm");
-else  fanAlarm.status.setCode("Cooling OK");
+/*Alarm signals -- the logic stays in each actuator's status (for the JSON).*/
+bool tempAlm = temp1.status.alm();
+bool doorAlm = doorCabinet;
+bool fanAlm  = fanGeneralAlarm();
+fanAlarm.status.setAlm(fanAlm);
+fanAlarm.status.setCode(fanAlm ? "Fan Alarm" : "Fan OK");
+tempAlarm.status.setAlm(tempAlm);
+tempAlarm.status.setCode(tempAlm ? "Temp Alarm" : "Temp OK");
+
+/*Configurable output relays (item B, setPin approach): each alarm actuator is
+pointed at its mapped relay via setPin() -- re-pointed only when the map
+changes. Then every cycle each ASSIGNED alarm writes its own pin: temp/door
+direct (relay ON = alarm), fan inverted (fail-safe). Unassigned alarms don't
+write; free/vacated relays are held LOW by applyRelayMapping().*/
+static uint8_t appliedMap[4] = {255, 255, 255, 255};
+if(memcmp(appliedMap, configStore.cfg.relayMap, 4) != 0){
+  applyRelayMapping();
+  memcpy(appliedMap, configStore.cfg.relayMap, 4);
+}
+if(g_tempOut >= 0) tempAlarm.writePin(tempAlm);
+if(g_doorOut >= 0) doorOpenAlarm.writePin(doorAlm);
+if(g_fanOut  >= 0) fanAlarm.writePin(!fanAlm);
 
 Serial.println();
 Serial.print("POWER FAN MONITORING:");
@@ -460,6 +531,11 @@ void loop() {
     JsonDocument snapshot;
     bool haveSnapshot = false;
     if(xSemaphoreTake(stateMutex, pdMS_TO_TICKS(2000)) == pdTRUE){
+      /*Keep the controller IP current for the snapshot; only touches the heap
+      when it actually changes (avoids strdup churn every publish).*/
+      String curIp = (WiFi.status()==WL_CONNECTED) ? WiFi.localIP().toString() : String("0.0.0.0");
+      if(controller.IP()==nullptr || curIp != controller.IP())
+        controller.setIP(curIp.c_str());
       snapshot = controller.toJson();
       haveSnapshot = true;
       xSemaphoreGive(stateMutex);

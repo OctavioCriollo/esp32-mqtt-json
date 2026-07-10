@@ -38,6 +38,8 @@ struct AppConfig {
     char mqttCity[24];       /*e.g. "quito", "guayaquil"*/
     char mqttSite[24];       /*RBS name; the MAC is appended automatically*/
     char mqttSubsystem[24];  /*power, generador, baterias, seguridad*/
+    uint8_t fanAlarmLogic;   /*general fan alarm: 0=OR 1=AND 2=only FAN1 3=only FAN2*/
+    uint8_t relayMap[4];     /*OUT1-4 -> signal: 0=free 1=tempAlarm 2=doorOpenAlarm 3=fanAlarm*/
 };
 
 class ConfigStore {
@@ -68,11 +70,17 @@ public:
         _getStr("mqttCity",  cfg.mqttCity,      sizeof(cfg.mqttCity),      "guayaquil");
         _getStr("mqttSite",  cfg.mqttSite,      sizeof(cfg.mqttSite),      "RBS-000");
         _getStr("mqttSubsys",cfg.mqttSubsystem, sizeof(cfg.mqttSubsystem), "power");
+        cfg.fanAlarmLogic = _prefs.getUChar("fanLogic", 0);
+        if (_prefs.getBytes("relayMap", cfg.relayMap, sizeof(cfg.relayMap)) != sizeof(cfg.relayMap)){
+            cfg.relayMap[0]=2; cfg.relayMap[1]=3; cfg.relayMap[2]=1; cfg.relayMap[3]=0;   /*door,fan,temp,free*/
+        }
         _prefs.end();
         /*Sanity: a broken saved range must never disable cooling.*/
         if (!(cfg.highTemp > cfg.lowTemp)) { cfg.highTemp = 43.0f; cfg.lowTemp = 24.0f; }
         /*Sanity: keep the UTC offset within the real-world range.*/
         if (!(cfg.tzOffset >= -12.0f && cfg.tzOffset <= 14.0f)) cfg.tzOffset = -5.0f;
+        if (cfg.fanAlarmLogic > 3) cfg.fanAlarmLogic = 0;   /*guard the enum range*/
+        for (int i = 0; i < 4; i++) if (cfg.relayMap[i] > 3) cfg.relayMap[i] = 0;
     }
 
     bool save(){
@@ -91,6 +99,8 @@ public:
         _prefs.putString("mqttCity",  cfg.mqttCity);
         _prefs.putString("mqttSite",  cfg.mqttSite);
         _prefs.putString("mqttSubsys",cfg.mqttSubsystem);
+        _prefs.putUChar("fanLogic",   cfg.fanAlarmLogic);
+        _prefs.putBytes("relayMap",   cfg.relayMap, sizeof(cfg.relayMap));
         _prefs.end();
         return true;
     }

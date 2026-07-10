@@ -546,8 +546,8 @@ private:
         no /api/status change needed).*/
         page.replace("%MQTTOPER%",   _store->cfg.mqttOperator);
         page.replace("%MQTTSUBSYS%", _store->cfg.mqttSubsystem);
-        /*Client ID = site-MAC-subsystem, the same value the main builds for
-        the MQTT client; the MAC makes it the unique device identity.*/
+        /*Client ID = site-MAC, the same value the main builds for the MQTT
+        client; the MAC makes it the unique device identity.*/
         /*Factory MAC from eFuse (same source as the main), so the portal's
         Client ID / topics match exactly what the device publishes.*/
         uint8_t _mr[6]; esp_read_mac(_mr, ESP_MAC_WIFI_STA);

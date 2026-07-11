@@ -274,7 +274,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <form method="POST" action="/update" enctype="multipart/form-data">
 <input type="file" name="firmware" accept=".bin">
 <button type="submit">Save and Restart</button></form>
-<div class="sub" id="otaLine" style="text-align:center;min-height:1.1em;margin-top:8px">&nbsp;</div>
+<div class="sub" id="otaLine" style="text-align:center;font-size:.74rem;min-height:1.1em;margin-top:8px">&nbsp;</div>
 <p class="hint" style="text-align:center;margin-top:8px">Firmware actual: <b id="mVer" style="color:var(--txt)">v--</b> &middot; se actualiza solo al flashear una versi&oacute;n nueva</p>
 </section>
 </div>

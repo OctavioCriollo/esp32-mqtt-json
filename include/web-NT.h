@@ -186,7 +186,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 </div>
 </div>
 <div class="metric span2">
-<div class="lab">Cabinet Fan Speed</div>
+<div class="lab">Fan Speed Monitoring</div>
 <div class="duo">
 <div style="text-align:center">
 <div style="display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:.82rem;color:var(--mut)">FAN 1</span><span class="val" style="font-size:1.35rem" id="mF1">--<small>%</small></span></div>

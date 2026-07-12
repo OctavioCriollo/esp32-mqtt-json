@@ -232,11 +232,11 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <canvas class="spark" id="spark"></canvas>
 </div>
 <div class="metric span2">
-<div class="duo">
-<div><div class="lab">Temp Sensor</div><div id="mTS"><span class="badge n">&mdash;</span></div></div>
-<div><div class="lab">Temp Alarm</div><div id="mTA"><span class="badge n">&mdash;</span></div></div>
-</div>
-</div>
+<div class="lab">Temperature Sensor</div>
+<div class="duo" style="align-items:center;justify-content:space-around;gap:8px">
+<div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="font-size:.82rem;color:var(--mut)">SENSOR</span><span id="mTS"><span class="badge n">&mdash;</span></span></div>
+<div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="font-size:.82rem;color:var(--mut)">TEMP</span><span id="mTA"><span class="badge n">&mdash;</span></span></div>
+</div></div>
 <div class="metric span2">
 <div class="lab">Fan Speed Monitoring</div>
 <div class="duo">

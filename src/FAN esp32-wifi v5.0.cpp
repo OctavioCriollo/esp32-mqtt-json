@@ -68,7 +68,6 @@ MQTT mqtt(WIFIClient);
 
 #define OPEN true
 #define CLOSE false
-#define TEMP_HISTERESIS 3
 
 /*Definicion Variable Globales:
 ====================================================*/
@@ -357,12 +356,14 @@ void runControlCycle(){
   /*Dynamic thresholds (item G): editable at runtime via config*/
   const float HIGH_T = configStore.cfg.highTemp;
   const float LOW_T  = configStore.cfg.lowTemp;
+  const float TEMP_HYSTERESIS = configStore.cfg.tempHysteresis;
   /*Keep the DS18B20's reported upper/lower in sync with the live thresholds
   (shown in the JSON; the /api/thresholds Set updates cfg but not these).
   Cheap float setters, safe to refresh each cycle.*/
   temp1.setUpper(HIGH_T);
   temp1.setLower(LOW_T);
 bool doorCabinet = doorOpenMon.readPin();
+static bool highTempAlarmActive = false;
 float tempCabinet = temp1.readTemperature();
 
 /*PROCESSING PARAMETERS
@@ -395,12 +396,19 @@ if(!isnan(tempCabinet)){
   /*Temperature-LEVEL alarm (distinct from the sensor-failure alarm, which
   the library sets in readTemperature). HIGH is critical (drives the relay);
   LOW is informational (not critical). Hysteresis holds the high alarm until
-  temp drops below HIGH_T - TEMP_HISTERESIS.*/
-  if(tempCabinet > HIGH_T){
-    temp1.status.setAlm(ALARM);      temp1.status.setCode(HIGH_TEMP);
-  }
-  else if(tempCabinet > HIGH_T - TEMP_HISTERESIS and temp1.status.alm()){
-    temp1.status.setCode(TEMP_DECREASING);   /*hold alarm through hysteresis band*/
+  temp drops below HIGH_T - TEMP_HYSTERESIS. The reset band is configured
+  from the dashboard and persisted in NVS.*/
+  /*Canonical hysteresis state:
+      next = above HIGH_T OR (previous AND above HIGH_T - n)
+    Keep this latch separate because readTemperature() resets the sensor
+    status on every valid read. Sensor-failure alarms therefore cannot be
+    mistaken for a previously active high-temperature alarm.*/
+  highTempAlarmActive = (tempCabinet > HIGH_T) ||
+                        (highTempAlarmActive &&
+                         tempCabinet > HIGH_T - TEMP_HYSTERESIS);
+  if(highTempAlarmActive){
+    temp1.status.setAlm(ALARM);
+    temp1.status.setCode(tempCabinet > HIGH_T ? HIGH_TEMP : TEMP_DECREASING);
   }
   else if(tempCabinet < LOW_T){
     temp1.status.setAlm(NOT_ALARM);  temp1.status.setCode(LOW_TEMP);

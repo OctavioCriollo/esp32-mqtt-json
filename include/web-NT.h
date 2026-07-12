@@ -7,6 +7,7 @@ user "admin", password = configStore.cfg.webPass):
   GET  /api/status      live JSON snapshot (temp, PWM, alarms, uptime, rssi)
   POST /api/config      save configuration to NVS, then reboot
   POST /api/thresholds  save Low/High temp to NVS, applied live (no reboot)
+  POST /api/hysteresis  save high-temp alarm reset band, applied live
   POST /update          OTA firmware upload (.bin from CI artifacts)
   POST /reboot          manual restart
 
@@ -112,6 +113,15 @@ background:linear-gradient(145deg,var(--accent),var(--accent2));color:#fff;font-
 cursor:pointer;width:100%;transition:filter .15s,transform .05s}
 button:active{transform:translateY(1px)}
 .btnghost{margin-top:0;width:auto;padding:9px 20px}
+.thr-row{display:grid;grid-template-columns:minmax(96px,150px) minmax(150px,210px) auto;align-items:end;justify-content:start;gap:10px}
+.thr-row>div{min-width:0}
+.thr-row input{height:42px}
+.thr-high{display:flex;align-items:stretch;gap:7px}
+.thr-high input{min-width:0}
+.thr-set .btnghost{height:42px;padding:0 16px}
+.hyst-open{flex:0 0 42px;width:42px;height:42px;margin:0;padding:0;display:grid;place-items:center;
+background:var(--bg2);border:1px solid var(--line);border-radius:9px;color:var(--accent)}
+.hyst-open svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 small{color:var(--mut);font-size:.74rem}
 .bulb{display:inline-block;width:24px;height:24px;border-radius:50%;background:var(--ok);vertical-align:middle;cursor:pointer}
 .bulb.on{background:var(--bad);animation:pulse 1s infinite}
@@ -162,6 +172,22 @@ background:var(--card);border:1px solid var(--line);color:var(--mut);cursor:poin
 .pc-lims{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .pc-lim{display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:var(--bg2);border:1px solid var(--line);border-radius:11px;color:var(--mut);font-size:.7rem;font-weight:700}
 .pc-lim b{color:var(--txt);font-size:.74rem;font-weight:700}
+.hy-card{max-width:560px;max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;
+-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#34445f transparent;touch-action:pan-y}
+.hy-shell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 12px 8px;margin:12px 0}
+.hy-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:27px;margin-bottom:7px}
+.hy-tlbl{min-width:0;color:var(--mut);font-size:.72rem;font-weight:700;text-transform:uppercase}
+.hy-badges{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;flex:0 0 auto}
+.hy-badge{min-height:27px;display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
+.hy-badge.n{color:var(--ok);background:rgba(52,211,153,.11);border:1px solid rgba(52,211,153,.28)}
+.hy-badge.reset{color:var(--accent);background:rgba(56,189,248,.11);border:1px solid rgba(56,189,248,.3)}
+.hy-box{position:relative;width:100%;aspect-ratio:1.58;min-height:260px;overflow:hidden;background:var(--bg2);border:1px solid var(--line);border-radius:10px}
+.hy-box canvas{display:block;width:100%;height:100%;border-radius:9px;cursor:grab;touch-action:pan-y}
+.hy-box canvas:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.hy-box.drag canvas{cursor:grabbing}
+.hy-hint{min-height:17px;margin:8px 2px 0!important;color:var(--mut);font-size:.72rem!important;line-height:1.35;text-align:center}
+.hy-hint span{display:block}
+#hystModal .mrow{flex:0 0 auto}
 .pwmg-wrap{display:flex;gap:16px;justify-content:center;padding:4px 0}
 .pwmg{flex:1;max-width:160px;text-align:center;cursor:pointer;padding:8px 6px;border-radius:14px;border:1px solid transparent}
 .pwmg-ring{position:relative;width:100%;max-width:130px;margin:0 auto;transition:filter .15s}
@@ -176,6 +202,7 @@ background:var(--card);border:1px solid var(--line);color:var(--mut);cursor:poin
 button:hover{filter:brightness(1.08)}
 .orow2:hover{border-color:var(--accent)}
 .pwmg:hover .pwmg-ring{filter:brightness(1.08)}
+.hyst-open:hover{border-color:var(--accent);background:rgba(56,189,248,.08)}
 }
 @media(max-width:520px){
 #pwmModal .modal-card{padding:16px}
@@ -186,6 +213,18 @@ button:hover{filter:brightness(1.08)}
 .pc-frac{min-width:0}
 .pwmg-wrap{gap:10px}
 .pwmg-pct{font-size:1.35rem}
+.thr-row{grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr) auto;gap:6px}
+.thr-row label{font-size:.68rem;white-space:nowrap}
+.thr-high{gap:5px}
+.hyst-open{flex-basis:38px;width:38px}
+.thr-set{grid-column:auto}
+.thr-set .btnghost{width:auto;padding:0 10px}
+#hystModal .modal-card{padding:16px}
+.hy-shell{padding:10px 10px 7px}
+.hy-top{align-items:flex-start;flex-direction:column;gap:6px}
+.hy-badges{width:100%;flex-wrap:wrap;justify-content:flex-start;gap:5px}
+.hy-badge{padding-inline:8px;font-size:.68rem}
+.hy-box{aspect-ratio:1.2;min-height:250px}
 }
 @media(max-width:520px){.grid{grid-template-columns:1fr}.span2{grid-column:auto}.fgrid{grid-template-columns:1fr}
 .metric .val{font-size:1.45rem}.tabbtn{font-size:.74rem;padding:9px 4px}
@@ -216,20 +255,20 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <div class="tabpane active" id="pane-tele">
 <div class="grid">
 <div class="metric span2">
-<div class="lab">Temperature Range</div>
-<div class="duo" style="align-items:flex-end">
-<div><label>Low Temp &deg;C</label><input type="number" step="0.5" id="inLow" value="%LOWTEMP%"></div>
-<div><label>High Temp &deg;C</label><input type="number" step="0.5" id="inHigh" value="%HIGHTEMP%"></div>
-<div style="flex:0 0 auto"><button class="btnghost" onclick="setThr()">Set</button></div>
-</div>
-<div class="sub" id="thrMsg">&nbsp;</div>
-</div>
-<div class="metric span2">
 <div class="lab">Cabinet Temperature</div>
 <div class="val" id="mTemp">--<small>&deg;C</small></div>
 <div class="sub" id="mTempSub">&nbsp;</div>
 <div class="bar"><i id="bTemp"></i></div>
 <canvas class="spark" id="spark"></canvas>
+</div>
+<div class="metric span2">
+<div class="lab">Temperature Range</div>
+<div class="thr-row">
+<div><label>Low Temp &deg;C</label><input type="number" step="0.5" id="inLow" value="%LOWTEMP%"></div>
+<div><label>High Temp &deg;C</label><div class="thr-high"><input type="number" step="0.5" id="inHigh" value="%HIGHTEMP%"><button type="button" class="hyst-open" onclick="openHyst()" aria-label="Configure high-temperature hysteresis" aria-haspopup="dialog" aria-controls="hystModal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17H16V7H21"/><path d="M21 7H8V17H3"/></svg></button></div></div>
+<div class="thr-set"><button class="btnghost" onclick="setThr()">Set</button></div>
+</div>
+<div class="sub" id="thrMsg">&nbsp;</div>
 </div>
 <div class="metric span2">
 <div class="lab">Temperature Sensor</div>
@@ -374,7 +413,22 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 </div>
 <div class="mrow">
 <button onclick="pwmSet()">Set</button>
-<button onclick="pwmClose()" style="background:none;border:1px solid var(--line);color:var(--mut)">Cerrar</button>
+<button onclick="pwmClose()" style="background:none;border:1px solid var(--line);color:var(--mut)">Close</button>
+</div>
+</div>
+</div>
+
+<div class="modal" id="hystModal" role="dialog" aria-modal="true" aria-labelledby="hystTitle">
+<div class="modal-card hy-card">
+<h3 id="hystTitle">Temperature Hysteresis</h3>
+<div class="hy-shell">
+<div class="hy-top"><span class="hy-tlbl">HIGH_T alarm hysteresis</span><span class="hy-badges"><span id="hyN" class="hy-badge n">n = -- &deg;C</span><span id="hyReset" class="hy-badge reset">Alarm reset = -- &deg;C</span></span></div>
+<div id="hyBox" class="hy-box"><canvas id="hyCanvas" tabindex="0" role="slider" aria-label="High-temperature alarm hysteresis n" aria-valuemin="0" aria-valuenow="%TEMPHYST%"></canvas></div>
+<p class="hy-hint"><span>Drag <b style="color:var(--ok)">n</b> to set the alarm reset.</span><span>Max n = 20% (HIGH_T &minus; LOW_T).</span></p>
+</div>
+<div class="mrow">
+<button id="hySetBtn" onclick="hystSet()">Set</button>
+<button onclick="hystClose()" style="background:none;border:1px solid var(--line);color:var(--mut)">Close</button>
 </div>
 </div>
 </div>
@@ -408,7 +462,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 </div>
 
 <script>
-var LOW=%LOWTEMP%,HIGH=%HIGHTEMP%,hist=[],fail=0;
+var LOW=%LOWTEMP%,HIGH=%HIGHTEMP%,HYST=%TEMPHYST%,hist=[],fail=0;
 var _cssMemo={};function css(v){if(_cssMemo[v]==null)_cssMemo[v]=getComputedStyle(document.documentElement).getPropertyValue(v);return _cssMemo[v]}
 function col(t){if(t>=HIGH)return css('--bad');if(t>=HIGH-3)return css('--warn');
 if(t<=LOW)return css('--accent');return css('--ok')}
@@ -525,6 +579,7 @@ if(_ota)_ota.onsubmit=function(){
 (function(){
  var LOW_T=+LOW,HIGH_T=+HIGH,MARG=6;
  var st={n:%PWMN%,p:%PWMP%,cx:0.62,drag:null};
+ var saved={n:st.n,p:st.p,cx:st.cx};
  var cv=document.getElementById('pcCanvas'),g=cv.getContext('2d'),box=document.getElementById('pcBox');
  var eqEl=document.getElementById('pcEq'),nB=document.getElementById('pcN'),pB=document.getElementById('pcP');
  var plot=null;
@@ -554,7 +609,7 @@ if(_ota)_ota.onsubmit=function(){
  function curve(){
   var lx=tX(LOW_T),hx=tX(HIGH_T);
   g.fillStyle='rgba(56,189,248,.08)';g.fillRect(lx,plot.t,hx-lx,plot.ih);
-  g.strokeStyle='#38bdf8';g.lineWidth=3;g.lineCap='round';g.lineJoin='round';g.beginPath();
+  g.strokeStyle='#38bdf8';g.lineWidth=2;g.lineCap='round';g.lineJoin='round';g.beginPath();
   var s=Math.max(100,Math.round(plot.iw));
   for(var i=0;i<=s;i++){var t=plot.mn+(plot.mx-plot.mn)*i/s,x=tX(t),y=vY(pT(t));if(i===0)g.moveTo(x,y);else g.lineTo(x,y);}
   g.stroke();
@@ -587,8 +642,61 @@ if(_ota)_ota.onsubmit=function(){
  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
  window.addEventListener('resize',function(){if(document.getElementById('pwmModal').classList.contains('open'))draw();});
  window.openPwm=function(){var li=document.getElementById('inLow'),hi=document.getElementById('inHigh');LOW_T=li?+li.value:+LOW;HIGH_T=hi?+hi.value:+HIGH;document.getElementById('pwmModal').classList.add('open');requestAnimationFrame(function(){eq();draw();});};
- window.pwmClose=function(){document.getElementById('pwmModal').classList.remove('open');};
- window.pwmSet=function(){var b=new URLSearchParams();b.append('pwmN',st.n.toFixed(3));b.append('pwmP',st.p.toFixed(3));fetch('/api/pwmcurve',{method:'POST',body:b}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(){pwmClose();}).catch(function(){alert('Could not save the PWM curve.');});};
+ window.pwmClose=function(){st.n=saved.n;st.p=saved.p;st.cx=saved.cx;st.drag=null;box.classList.remove('drag');document.getElementById('pwmModal').classList.remove('open');};
+ window.pwmSet=function(){var b=new URLSearchParams();b.append('pwmN',st.n.toFixed(3));b.append('pwmP',st.p.toFixed(3));fetch('/api/pwmcurve',{method:'POST',body:b}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(){saved.n=st.n;saved.p=st.p;saved.cx=st.cx;pwmClose();}).catch(function(){alert('Could not save the PWM curve.');});};
+})();
+
+/* --- High-temperature alarm hysteresis popup: draggable reset band n --- */
+(function(){
+ var LT=+LOW,HT=+HIGH,plot=null;
+ var st={n:+HYST,saved:+HYST,drag:false};
+ var mod=document.getElementById('hystModal'),cv=document.getElementById('hyCanvas'),g=cv.getContext('2d'),box=document.getElementById('hyBox');
+ var nEl=document.getElementById('hyN'),resetEl=document.getElementById('hyReset'),setBtn=document.getElementById('hySetBtn');
+ function hc(v,a,b){return Math.min(b,Math.max(a,v));}
+ function maxN(){return Math.floor(Math.max(0,HT-LT)*2+.000001)/10;}
+ function resetT(){return HT-st.n;}
+ function calc(){var w=cv.clientWidth,h=cv.clientHeight,c=w<390;plot={w:w,h:h,l:c?48:58,r:w-(c?54:58),t:20,b:h-(c?52:50)};plot.on=plot.t+31;plot.off=plot.b-29;plot.mn=LT-5;plot.mx=HT+5;}
+ function tx(t){return plot.l+(t-plot.mn)/(plot.mx-plot.mn)*(plot.r-plot.l);}
+ function xt(x){return plot.mn+(x-plot.l)/(plot.r-plot.l)*(plot.mx-plot.mn);}
+ function rr(x,y,w,h,r){r=Math.min(r,w/2,h/2);g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+ function thresholdLabel(x,title,value,color,left){g.save();g.textAlign=left?'right':'left';g.textBaseline='top';g.font='700 10px system-ui,sans-serif';g.fillStyle=color;g.fillText(title,x+(left?-5:5),plot.b+8);g.font='600 9px system-ui,sans-serif';g.fillStyle='#8896ac';g.fillText(value,x+(left?-5:5),plot.b+23);g.restore();}
+ function draw(){if(!plot)return;
+  var lx=tx(LT),rx=tx(resetT()),hx=tx(HT),handleY=(plot.on+plot.off)/2,ph=plot.b-plot.t;
+  g.clearRect(0,0,plot.w,plot.h);g.fillStyle='#0e1626';g.fillRect(0,0,plot.w,plot.h);
+  g.save();g.strokeStyle='rgba(136,150,172,.12)';g.lineWidth=1;g.setLineDash([3,5]);
+  for(var i=0;i<=4;i++){var y=plot.t+ph*i/4;g.beginPath();g.moveTo(plot.l,y);g.lineTo(plot.r,y);g.stroke();}g.restore();
+  g.save();g.strokeStyle='#53627b';g.lineWidth=1.2;g.beginPath();g.moveTo(plot.l,plot.t);g.lineTo(plot.l,plot.b);g.lineTo(plot.r,plot.b);g.stroke();g.restore();
+  [[lx,'rgba(136,150,172,.48)'],[rx,'rgba(52,211,153,.65)'],[hx,'rgba(248,113,113,.68)']].forEach(function(a){g.save();g.strokeStyle=a[1];g.lineWidth=1.2;g.setLineDash([5,5]);g.beginPath();g.moveTo(a[0],plot.b);g.lineTo(a[0],plot.off);g.stroke();g.restore();});
+  g.save();g.lineWidth=2;g.lineJoin='round';g.lineCap='round';
+  g.strokeStyle='#34d399';g.beginPath();g.moveTo(plot.l,plot.off);g.lineTo(hx,plot.off);g.stroke();
+  g.strokeStyle='#f87171';g.beginPath();g.moveTo(rx,plot.on);g.lineTo(plot.r,plot.on);g.stroke();
+  g.strokeStyle='#34d399';g.beginPath();g.moveTo(rx,plot.on);g.lineTo(rx,plot.off);g.stroke();
+  g.strokeStyle='#f87171';g.beginPath();g.moveTo(hx,plot.off);g.lineTo(hx,plot.on);g.stroke();g.restore();
+  g.save();g.font='700 10px system-ui,sans-serif';g.textAlign='left';g.textBaseline='bottom';g.fillStyle='#f87171';g.fillText('TEMP ALARM',plot.l+8,plot.on-8);g.fillStyle='#34d399';g.fillText('OK',plot.l+8,plot.off-8);
+  g.translate(13,(plot.t+plot.b)/2);g.rotate(-Math.PI/2);g.textAlign='center';g.fillStyle='#8896ac';g.font='700 9px system-ui,sans-serif';g.fillText('ALARM STATE',0,0);g.restore();
+  thresholdLabel(lx,'LOW_T',LT.toFixed(1)+' \u00B0C','#8896ac',true);
+  thresholdLabel(rx,'RESET',resetT().toFixed(1)+' \u00B0C','#34d399',true);
+  thresholdLabel(hx,'HIGH_T',HT.toFixed(1)+' \u00B0C','#f87171',false);
+  g.save();g.fillStyle='#8896ac';g.font='700 10px system-ui,sans-serif';g.textAlign='center';g.textBaseline='bottom';g.fillText('Temperature',(plot.l+plot.r)/2,plot.h-4);g.restore();
+  g.save();g.fillStyle='rgba(52,211,153,.18)';g.beginPath();g.arc(rx,handleY,13,0,Math.PI*2);g.fill();g.fillStyle='#0e1626';g.strokeStyle='#34d399';g.lineWidth=3;g.beginPath();g.arc(rx,handleY,6.5,0,Math.PI*2);g.fill();g.stroke();
+  var label='n = '+st.n.toFixed(1)+' \u00B0C';g.font='700 10px system-ui,sans-serif';var lw=Math.ceil(g.measureText(label).width)+16,lh=24,onRight=rx<(plot.l+plot.r)/2,labelX=onRight?rx+14:rx-lw-14,labelY=handleY-lh/2;
+  rr(labelX,labelY,lw,lh,7);g.fillStyle='rgba(20,29,48,.96)';g.fill();g.strokeStyle='rgba(52,211,153,.42)';g.lineWidth=1;g.stroke();g.fillStyle='#34d399';g.textAlign='center';g.textBaseline='middle';g.fillText(label,labelX+lw/2,handleY+.5);g.restore();
+ }
+ function fit(){var r=box.getBoundingClientRect();if(r.width<=0||r.height<=0)return;var d=Math.min(window.devicePixelRatio||1,2);cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d);g.setTransform(d,0,0,d,0,0);calc();draw();}
+ function sync(announce){nEl.textContent='n = '+st.n.toFixed(1)+' \u00B0C';resetEl.textContent='Alarm reset = '+resetT().toFixed(1)+' \u00B0C';cv.setAttribute('aria-valuenow',st.n.toFixed(1));cv.setAttribute('aria-valuemax',maxN().toFixed(1));cv.setAttribute('aria-valuetext','Hysteresis '+st.n.toFixed(1)+' degrees Celsius; alarm reset '+resetT().toFixed(1)+' degrees Celsius');if(announce)cv.setAttribute('aria-label','High-temperature alarm hysteresis n, '+st.n.toFixed(1)+' degrees Celsius');draw();}
+ function setN(v,announce){var nv=Math.round(hc(v,0,maxN())*10)/10;if(nv===st.n)return;st.n=nv;sync(announce);}
+ function pos(e){var r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+ function near(e){if(!plot)return false;var q=pos(e),x=tx(resetT()),y=(plot.on+plot.off)/2;return Math.hypot(q.x-x,q.y-y)<=30||(Math.abs(q.x-x)<=17&&q.y>=plot.on-12&&q.y<=plot.off+12);}
+ function fromPointer(e){setN(HT-xt(pos(e).x),false);}
+ cv.addEventListener('pointerdown',function(e){if(!near(e))return;st.drag=true;box.classList.add('drag');cv.setPointerCapture(e.pointerId);fromPointer(e);draw();});
+ cv.addEventListener('pointermove',function(e){if(st.drag)fromPointer(e);});
+ function finish(e){if(!st.drag)return;st.drag=false;box.classList.remove('drag');if(cv.hasPointerCapture(e.pointerId))cv.releasePointerCapture(e.pointerId);sync(true);}
+ cv.addEventListener('pointerup',finish);cv.addEventListener('pointercancel',finish);
+ cv.addEventListener('keydown',function(e){var step=e.shiftKey?1:.1,next=st.n;if(e.key==='ArrowLeft'||e.key==='ArrowUp')next+=step;else if(e.key==='ArrowRight'||e.key==='ArrowDown')next-=step;else if(e.key==='Home')next=0;else if(e.key==='End')next=maxN();else return;e.preventDefault();setN(next,true);});
+ window.addEventListener('resize',function(){if(mod.classList.contains('open'))fit();});
+ window.openHyst=function(){LT=+LOW;HT=+HIGH;st.saved=hc(+HYST,0,maxN());st.n=st.saved;mod.classList.add('open');requestAnimationFrame(function(){sync(false);fit();cv.focus();});};
+ window.hystClose=function(){st.n=st.saved;mod.classList.remove('open');document.querySelector('.hyst-open').focus();};
+ window.hystSet=function(){setBtn.disabled=true;var b=new URLSearchParams();b.append('n',st.n.toFixed(1));fetch('/api/hysteresis',{method:'POST',body:b}).then(function(r){if(!r.ok)return r.text().then(function(t){throw t});return r.json();}).then(function(j){HYST=parseFloat(j.n);st.saved=HYST;st.n=HYST;mod.classList.remove('open');document.querySelector('.hyst-open').focus();}).catch(function(e){alert((''+e)||'Could not save hysteresis.');}).finally(function(){setBtn.disabled=false;});};
 })();
 document.querySelectorAll('[role="button"]').forEach(function(el){
  el.addEventListener('keydown',function(e){
@@ -604,8 +712,8 @@ function thrMsg(txt,cvar){var m=document.getElementById('thrMsg');
 function setThr(){var lo=document.getElementById('inLow').value,hi=document.getElementById('inHigh').value;
  var b=new URLSearchParams();b.append('lowTemp',lo);b.append('highTemp',hi);
  fetch('/api/thresholds',{method:'POST',body:b}).then(function(r){
-  if(!r.ok)return r.text().then(function(t){throw t});return r.json();}).then(function(j){
-  LOW=parseFloat(j.lowT);HIGH=parseFloat(j.highT);
+ if(!r.ok)return r.text().then(function(t){throw t});return r.json();}).then(function(j){
+  LOW=parseFloat(j.lowT);HIGH=parseFloat(j.highT);if(j.n!=null)HYST=parseFloat(j.n);
   thrMsg('Saved ✓ ('+LOW+'–'+HIGH+' °C)','--ok');
  }).catch(function(e){thrMsg((''+e)||'Error','--bad');});}
 var DASH_CACHE_KEY='fanDashboardStateV1',DASH_CACHE_MAX_AGE=60000;
@@ -707,11 +815,11 @@ private:
     }
 
     String _renderPortal(){
-        /*Reserve up front: the ~19 replaces below must not realloc a 42 KB
+        /*Reserve up front: the replacements below must not realloc the ~55 KB
         string mid-build (that momentarily doubles the heap and fails once
         MQTT/TLS have fragmented it). Reserve first, then fill the buffer.*/
         String page;
-        page.reserve(46000);
+        page.reserve(60000);
         page = FPSTR(PORTAL_HTML);
         page.replace("%WIFISSID%",   _store->cfg.wifiSsid);
         page.replace("%MQTTSERVER%", _store->cfg.mqttServer);
@@ -719,6 +827,7 @@ private:
         page.replace("%MQTTUSER%",   _store->cfg.mqttUser);
         page.replace("%HIGHTEMP%",   String(_store->cfg.highTemp, 1));
         page.replace("%LOWTEMP%",    String(_store->cfg.lowTemp, 1));
+        page.replace("%TEMPHYST%",   String(_store->cfg.tempHysteresis, 1));
         page.replace("%PWMN%",       String(_store->cfg.pwmN, 2));
         page.replace("%PWMP%",       String(_store->cfg.pwmP, 2));
         page.replace("%MQTTCITY%",   _store->cfg.mqttCity);
@@ -850,6 +959,10 @@ public:
                 if (tz >= -12.0f && tz <= 14.0f) c.tzOffset = tz;   /*ignore junk*/
             }
             if (!(c.highTemp > c.lowTemp)) { c.highTemp = 43.0f; c.lowTemp = 24.0f; }
+            float maxHysteresis =
+                (float)((int)(((c.highTemp - c.lowTemp) * 2.0f) + 0.0001f)) / 10.0f;
+            if (!(c.tempHysteresis >= 0.0f)) c.tempHysteresis = 0.0f;
+            if (c.tempHysteresis > maxHysteresis) c.tempHysteresis = maxHysteresis;
             if (!_store->save()){
                 req->send(500, "text/plain", "Save failed");
                 return;
@@ -886,13 +999,44 @@ public:
                 return;
             }
             c.highTemp = hi; c.lowTemp = lo;
+            float maxHysteresis =
+                (float)((int)(((hi - lo) * 2.0f) + 0.0001f)) / 10.0f;
+            if (!(c.tempHysteresis >= 0.0f)) c.tempHysteresis = 0.0f;
+            if (c.tempHysteresis > maxHysteresis) c.tempHysteresis = maxHysteresis;
             if (!_store->save()){
                 req->send(500, "text/plain", "Save failed");
                 return;
             }
             req->send(200, "application/json",
                       "{\"ok\":true,\"lowT\":" + String(lo, 1) +
-                      ",\"highT\":" + String(hi, 1) + "}");
+                      ",\"highT\":" + String(hi, 1) +
+                      ",\"n\":" + String(c.tempHysteresis, 1) + "}");
+        });
+
+        /*High-temperature alarm hysteresis: n is the reset band in deg C.
+        It is constrained to 20% of HIGH_T - LOW_T and applied live.*/
+        _server.on("/api/hysteresis", HTTP_POST, [this](AsyncWebServerRequest* req){
+            if (!_auth(req)) return;
+            if (!req->hasParam("n", true)){
+                req->send(400, "text/plain", "Missing n");
+                return;
+            }
+            AppConfig& c = _store->cfg;
+            float n = req->getParam("n", true)->value().toFloat();
+            float maxN =
+                (float)((int)(((c.highTemp - c.lowTemp) * 2.0f) + 0.0001f)) / 10.0f;
+            if (!(n >= 0.0f && n <= maxN)){
+                req->send(400, "text/plain", "n must be between 0 and 20% of HIGH_T - LOW_T");
+                return;
+            }
+            c.tempHysteresis = n;
+            if (!_store->save()){
+                req->send(500, "text/plain", "Save failed");
+                return;
+            }
+            req->send(200, "application/json",
+                      "{\"ok\":true,\"n\":" + String(n, 1) +
+                      ",\"resetT\":" + String(c.highTemp - n, 1) + "}");
         });
 
         /*PWM curve (Fan PWM Curve popup): n=floor(0..1), p=exponent(1..10),

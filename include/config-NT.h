@@ -30,6 +30,7 @@ struct AppConfig {
     char webPass[33];
     float highTemp;   /*PWM = 100% at/above*/
     float lowTemp;    /*PWM = 0% at/below*/
+    float tempHysteresis; /*High-temp alarm reset band in deg C*/
     float tzOffset;   /*UTC offset in hours for SNTP (e.g. -5.0 = Ecuador)*/
     /*MQTT topic: operator/city/site-MAC/subsystem/{telemetria,control}. The
     device MAC is appended to the site at boot, so it is globally unique and
@@ -67,6 +68,7 @@ public:
         _getStr("webPass",   cfg.webPass,   sizeof(cfg.webPass),   WEB_ADMIN_PASS);
         cfg.highTemp = _prefs.getFloat("highTemp", 43.0f);
         cfg.lowTemp  = _prefs.getFloat("lowTemp",  24.0f);
+        cfg.tempHysteresis = _prefs.getFloat("tempHyst", 3.0f);
         cfg.tzOffset = _prefs.getFloat("tzOffset", -5.0f);
         _getStr("mqttOper",  cfg.mqttOperator,  sizeof(cfg.mqttOperator),  "claro");
         _getStr("mqttCity",  cfg.mqttCity,      sizeof(cfg.mqttCity),      "guayaquil");
@@ -81,6 +83,11 @@ public:
         _prefs.end();
         /*Sanity: a broken saved range must never disable cooling.*/
         if (!(cfg.highTemp > cfg.lowTemp)) { cfg.highTemp = 43.0f; cfg.lowTemp = 24.0f; }
+        /*The alarm reset band is limited to 20% of the configured range.*/
+        float maxTempHysteresis =
+            (float)((int)(((cfg.highTemp - cfg.lowTemp) * 2.0f) + 0.0001f)) / 10.0f;
+        if (!(cfg.tempHysteresis >= 0.0f && cfg.tempHysteresis <= maxTempHysteresis))
+            cfg.tempHysteresis = maxTempHysteresis < 3.0f ? maxTempHysteresis : 3.0f;
         /*Sanity: keep the UTC offset within the real-world range.*/
         if (!(cfg.tzOffset >= -12.0f && cfg.tzOffset <= 14.0f)) cfg.tzOffset = -5.0f;
         if (cfg.fanAlarmLogic > 3) cfg.fanAlarmLogic = 0;   /*guard the enum range*/
@@ -101,6 +108,7 @@ public:
         _prefs.putString("webPass",   cfg.webPass);
         _prefs.putFloat("highTemp",   cfg.highTemp);
         _prefs.putFloat("lowTemp",    cfg.lowTemp);
+        _prefs.putFloat("tempHyst",   cfg.tempHysteresis);
         _prefs.putFloat("tzOffset",   cfg.tzOffset);
         _prefs.putString("mqttOper",  cfg.mqttOperator);
         _prefs.putString("mqttCity",  cfg.mqttCity);

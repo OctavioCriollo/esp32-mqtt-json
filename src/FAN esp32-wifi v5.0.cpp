@@ -373,23 +373,25 @@ Either way the fans go to full and the alarm fires; a garbage low value
 must never be allowed to coast the fans down. This also avoids a second
 OneWire round-trip that the old isConnected() guard incurred.*/
 if(!isnan(tempCabinet)){
-  /*Fan speed control (unchanged): full above HIGH_T, off below the low
-  hysteresis point, proportional PWM in between. Zones are mutually
-  exclusive.*/
-  if(tempCabinet > HIGH_T){
-    speedFan1.write(PWM_MAX);
-    speedFan2.write(PWM_MAX);
+  /*Configurable PWM curve (shared by both fans), from NVS/portal:
+       PWM = PWM_MAX * ( n + (1-n)*x^p ),  x = (T-LOW_T)/(HIGH_T-LOW_T)
+    n = floor (0..1), p = exponent (1=linear, 2=parabolic). The floor n is
+    held at/below LOW_T; set n=0 for fully off when cold. p=1 & n=0.1 reproduce
+    the previous linear ramp (10% at LOW_T -> 100% at HIGH_T).*/
+  const float pN = configStore.cfg.pwmN, pP = configStore.cfg.pwmP;
+  if(tempCabinet >= HIGH_T){
+    pwm = PWM_MAX;
   }
-  else if(tempCabinet < LOW_T - n/(1-n)*(HIGH_T-LOW_T)){
-    speedFan1.write(PWM_MIN);
-    speedFan2.write(PWM_MIN);
+  else if(tempCabinet <= LOW_T){
+    pwm = pN * PWM_MAX;
   }
   else{
-    pwm = PWM_MAX*(1-n)/(HIGH_T-LOW_T)*(tempCabinet-LOW_T) + n*PWM_MAX; //Ecuacion PWM=f(Temp): PWM = m(temp - LOW_T)
-    pwm = round(pwm*100)/100;
-    speedFan1.write(pwm);
-    speedFan2.write(pwm);
+    float x = (tempCabinet - LOW_T) / (HIGH_T - LOW_T);
+    pwm = PWM_MAX * (pN + (1.0f - pN) * powf(x, pP));
   }
+  pwm = round(pwm*100)/100;
+  speedFan1.write(pwm);
+  speedFan2.write(pwm);
   /*Temperature-LEVEL alarm (distinct from the sensor-failure alarm, which
   the library sets in readTemperature). HIGH is critical (drives the relay);
   LOW is informational (not critical). Hysteresis holds the high alarm until

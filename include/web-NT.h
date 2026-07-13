@@ -819,7 +819,7 @@ private:
         string mid-build (that momentarily doubles the heap and fails once
         MQTT/TLS have fragmented it). Reserve first, then fill the buffer.*/
         String page;
-        page.reserve(60000);
+        page.reserve(sizeof(PORTAL_HTML) + 4096);   /*page size + margin for the %-token expansions; sizeof auto-tracks growth so it never goes stale*/
         page = FPSTR(PORTAL_HTML);
         page.replace("%WIFISSID%",   _store->cfg.wifiSsid);
         page.replace("%MQTTSERVER%", _store->cfg.mqttServer);

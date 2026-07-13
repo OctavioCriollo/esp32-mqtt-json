@@ -473,7 +473,7 @@ public:
        String str = "/dth22/" + String(id);
         const char* topic = str.c_str();
         setTopic(topic);
-        setModel(BME280_MODEL);
+        setModel(DTH22_MODEL);
     }
     /*GETTER atributos Class DTH22
     ====================================================*/

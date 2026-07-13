@@ -768,12 +768,18 @@ function restoreDashboardSnapshot(){try{
  hist=Array.isArray(snap.h)?snap.h.filter(function(v){return typeof v==='number'&&isFinite(v)}).slice(-60):[];
  renderStatus(snap.d,false);
 }catch(e){}}
-async function poll(){try{
- var r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw 0;
- var d=await r.json();fail=0;setLive(true);
- if(!renderStatus(d,true))return;
- saveDashboardSnapshot(d);
-}catch(e){if(++fail>=2)setLive(false)}}
+var _pollBusy=false;
+async function poll(){
+ if(_pollBusy)return;   /*single flight: skip the tick while one request is in progress (no pile-up, no out-of-order flips)*/
+ _pollBusy=true;
+ var ctl=new AbortController(),tmr=setTimeout(function(){ctl.abort();},2500);   /*bound each attempt: a dead board fails in 2.5 s, not at the TCP timeout*/
+ try{
+  var r=await fetch('/api/status',{cache:'no-store',signal:ctl.signal});if(!r.ok)throw 0;
+  var d=await r.json();fail=0;setLive(true);
+  if(renderStatus(d,true))saveDashboardSnapshot(d);
+ }catch(e){if(++fail>=2)setLive(false)}   /*2-strike filter kept: with bounded attempts, Offline shows in ~5-7 s deterministically*/
+ finally{clearTimeout(tmr);_pollBusy=false;}
+}
 restoreDashboardSnapshot();document.body.style.visibility='visible';poll();setInterval(poll,2000);window.addEventListener('resize',drawSpark);
 </script></body></html>
 )HTML";

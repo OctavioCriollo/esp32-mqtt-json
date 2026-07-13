@@ -562,6 +562,7 @@ class TACHOMETER: public Sensor {
 private:
     u_int8_t _pin;
     volatile long _pulses;
+    portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;   /*guards _pulses between the count() ISR and setRPM()*/
     unsigned long _rpm;
     ulong _lastTime;
     u_int8_t _pulseByCycle;
@@ -606,11 +607,19 @@ public:
         _lastTime = millis();
     }
     void IRAM_ATTR count(){   /*called from an ISR: must live in IRAM*/
+        portENTER_CRITICAL_ISR(&_mux);
         _pulses = _pulses + 1;   /*volatile ++ is deprecated since C++20*/
+        portEXIT_CRITICAL_ISR(&_mux);
     }
     void setRPM(unsigned long timing){
-        _rpm = (_pulses*60000.0)/(_pulseByCycle*timing);
+        /*Read and clear the pulse count as one atomic block, so an edge that
+        arrives between the read and the reset is counted next cycle, not lost.*/
+        long p;
+        portENTER_CRITICAL(&_mux);
+        p = _pulses;
         _pulses = 0;
+        portEXIT_CRITICAL(&_mux);
+        _rpm = (p*60000.0)/(_pulseByCycle*timing);   /*math outside the lock*/
         _lastTime = millis();
     }
     void enableISR(int mode, void(*intRoutine)()){

@@ -5,6 +5,7 @@
 #include <DallasTemperature.h>
 #include <Adafruit_I2CDevice.h>
 #include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 #include <SPI.h>
 #include <time.h>
 #include <map>
@@ -394,16 +395,58 @@ private:
     u_int8_t _resolution;
     const char* _communication;
     const char* _workingMode;
+    u_int8_t _addr;       /*I2C address: 0x76 generic modules, 0x77 Adafruit breakouts*/
+    bool _online;         /*begin() succeeded and the last read was plausible*/
+    Adafruit_BME280 _bme;
     float _temperature;
     float _humidity;
-    float _pressure;
+    float _pressure;      /*hPa*/
+
+    /*Lazy hardware init: globals are constructed before setup(), so Wire must
+    not be started from the constructor (same static-init rule as setPin /
+    applyRelayMapping). The first read -- or a sensor hot-plugged later --
+    lands here and (re)tries begin(): recovery with no reboot, like the
+    DS18B20 re-acquire. Tries the configured address, then the other one.*/
+    bool _ensureOnline(){
+        if(_online) return true;
+        Wire.begin();   /*idempotent; default pins GPIO21/22 = the board's I2C port*/
+        _online = _bme.begin(_addr, &Wire);
+        if(!_online){
+            u_int8_t alt = (_addr == BME280_ADDRESS) ? BME280_ADDRESS_ALTERNATE : BME280_ADDRESS;
+            if(_bme.begin(alt, &Wire)){ _addr = alt; _online = true; }
+        }
+        if(!_online){
+            status.setAlm(ALARM);
+            status.setCode(DISCONNECTED);
+        }
+        return _online;
+    }
+    /*Shared validation: cache a plausible reading, or fail to NAN +
+    DISCONNECTED so telemetry never carries stale data (the library returns
+    NAN when a measurement is disabled; an unplugged sensor reads outside the
+    physical range). Same failsafe rule as the DS18B20.*/
+    float _validate(float v, float lo, float hi, float& cache){
+        if(isnan(v) || v < lo || v > hi){
+            cache = NAN;
+            _online = false;   /*force a re-begin on the next read*/
+            status.setAlm(ALARM);
+            status.setCode(DISCONNECTED);
+            return NAN;
+        }
+        cache = v;
+        status.setAlm(NOT_ALARM);
+        status.setCode(OK);
+        return v;
+    }
 
 public:
     /*CONSTRUCTOR Class BME280
     ====================================================*/ 
-    BME280(const char* id):
+    BME280(const char* id, u_int8_t addr = BME280_ADDRESS_ALTERNATE):
     Sensor(id),
-    _resolution(DEFAULT_RESOLUTION), _communication(I2C), _workingMode(SLAVE)
+    _resolution(DEFAULT_RESOLUTION), _communication(I2C), _workingMode(SLAVE),
+    _addr(addr), _online(false),
+    _temperature(NAN), _humidity(NAN), _pressure(NAN)
     {
         String str = "/bme280/" + String(id);
         const char* topic = str.c_str();
@@ -423,33 +466,70 @@ public:
         return _workingMode;
     }
     
-    /*METHOD Class BME280
-    =======================================*/
-    float readTemperature() {
-        //Code here
+    u_int8_t addr() const{
+        return _addr;
+    }
+    /*Last values the control task read (NAN while failing): no I2C traffic,
+    safe for the web/status paths -- same pattern as DS18B20::temperature().*/
+    float temperature() const{
         return _temperature;
     }
-    float readHumidity() {
-        //Code here
+    float humidity() const{
         return _humidity;
     }
-    float readPressure() {
-        //Code here
+    float pressure() const{
         return _pressure;
     }
 
+    /*METHOD Class BME280
+    =======================================*/
+    /*Real current readings, or NAN when the sensor is not delivering a valid
+    one. Physical ranges: -40..85 C, 0..100 %RH, 300..1100 hPa (Pa -> hPa).*/
+    float readTemperature() {
+        if(!_ensureOnline()){ _temperature = NAN; return NAN; }
+        return _validate(_bme.readTemperature(), -40.0f, 85.0f, _temperature);
+    }
+    float readHumidity() {
+        if(!_ensureOnline()){ _humidity = NAN; return NAN; }
+        return _validate(_bme.readHumidity(), 0.0f, 100.0f, _humidity);
+    }
+    float readPressure() {
+        if(!_ensureOnline()){ _pressure = NAN; return NAN; }
+        return _validate(_bme.readPressure() / 100.0f, 300.0f, 1100.0f, _pressure);
+    }
+    bool isConnected() {
+        return _ensureOnline();
+    }
+    bool tryConnection() {
+        Serial.printf("\nConnecting to %s Sensor!!!",model());
+        if(!isConnected()){
+            Serial.printf("\n%s sensor no Found.",model());
+            Serial.printf("\nCheck wiring or try a different address!\n");
+            return false;
+        }
+        Serial.printf("\n%s sensor Connected.",model());
+        Serial.printf("\nAddress: 0x%02X",_addr);
+        Serial.println();
+        return true;
+    }
+
     /*ARDUINO-JSON: Convert Class BME280 to JSON
-    ==============================================*/ 
-       JsonDocument toJson() override{
+    ==============================================*/
+    JsonDocument toJson() override{
         JsonDocument doc;
         doc["id"] = id();
-        doc["model"] = model();           
-        //Code 
-        //doc["label"] = label(); 
+        doc["model"] = model();
+        doc["temperature"] = _temperature;
+        doc["humidity"] = _humidity;
+        doc["pressure"] = _pressure;       /*hPa*/
+        doc["status"] = status.toJson();   /*{alm, code}: single alarm channel*/
+        doc["workingMode"] = _workingMode;
+        doc["communication"] = _communication;
+        doc["addr"] = _addr;
         doc["topic"] = topic();
         doc["timestamp"] = nowIso8601();   /*real time of serialization*/
         return doc;
-    }    
+    }
 };
 
 class DTH22: public Sensor {

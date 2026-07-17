@@ -369,7 +369,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <div class="f-full"><label>Portal password</label><input name="webPass" type="password" placeholder="(unchanged)"></div>
 </div>
 <button type="submit">Save and Restart</button>
-<br><small>Usuario del portal: <b>admin</b></small></form>
+<br><small>Portal user: <b>admin</b></small></form>
 </section>
 <section>
 <h2><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6z"/></svg>Firmware OTA</h2>

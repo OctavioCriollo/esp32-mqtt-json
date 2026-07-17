@@ -152,7 +152,7 @@ Multipurpose plug-and-play IoT PCB (Network Telemetrix): −48 VDC (telecom) or
 | I2C port | BME280 driver ready (temp/humidity/pressure) |
 | 4 × analog inputs (ADC1), SPI, BT | available for future use |
 
-[![Board video](https://img.youtube.com/vi/xHSDZ5ZZDWI/sddefault.jpg)](https://www.youtube.com/watch?v=xHSDZ5ZZDWI)
+[![NT-IoT Board — port map (click for the video overview)](images/board-video.jpg)](https://www.youtube.com/watch?v=xHSDZ5ZZDWI)
 
 *Click to watch the board overview on YouTube.*
 

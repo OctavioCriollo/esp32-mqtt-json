@@ -348,7 +348,8 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <div><label>MQTT User</label><input name="mqttUser" value="%MQTTUSER%"></div>
 <div><label>MQTT Password</label><input name="mqttPass" type="password" placeholder="(unchanged)"></div>
 <div class="f-full"><label>Client ID</label><input value="%CLIENTID%" readonly style="color:var(--mut)"></div>
-<div class="f-full"><label>Publish topic (telemetr&iacute;a)</label><input value="%TOPICPUB%" readonly style="color:var(--mut)"></div>
+<div class="f-full"><label>Publish topic (telemetry)</label><input value="%TOPICPUB%" readonly style="color:var(--mut)"></div>
+<div class="f-full"><label>Publish interval</label><select name="pubSecs">%PUBSECSOPTS%</select></div>
 <div class="f-full"><label>Subscribe topic (control)</label><input value="%TOPICSUB%" readonly style="color:var(--mut)"></div>
 </div>
 <button type="submit">Save and Restart</button></form>
@@ -865,6 +866,18 @@ private:
         page.replace("%PWMN%",       String(_store->cfg.pwmN, 2));
         page.replace("%PWMP%",       String(_store->cfg.pwmP, 2));
         page.replace("%CACERTSTATE%", _store->cfg.caCert[0] ? "Custom" : "Factory (Let&#39;s Encrypt)");
+        {   /*Publish-interval presets, stored value pre-selected*/
+            static const uint16_t pv[] = {1,2,5,10,30,60,120,300};
+            static const char* pl[] = {"every 1 s","every 2 s","every 5 s","every 10 s",
+                                       "every 30 s","every 1 min","every 2 min","every 5 min"};
+            String po;
+            for (size_t i = 0; i < 8; i++){
+                po += "<option value=\"" + String(pv[i]) + "\"";
+                if (pv[i] == _store->cfg.pubSecs) po += " selected";
+                po += ">" + String(pl[i]) + "</option>";
+            }
+            page.replace("%PUBSECSOPTS%", po);
+        }
         page.replace("%MQTTCITY%",   _store->cfg.mqttCity);
         page.replace("%MQTTSITE%",   _store->cfg.mqttSite);
         /*Device-identity tags shown in the dashboard header so the operator
@@ -992,6 +1005,10 @@ public:
             if (req->hasParam("tzOffset", true)){
                 float tz = req->getParam("tzOffset", true)->value().toFloat();
                 if (tz >= -12.0f && tz <= 14.0f) c.tzOffset = tz;   /*ignore junk*/
+            }
+            if (req->hasParam("pubSecs", true)){
+                int ps = req->getParam("pubSecs", true)->value().toInt();
+                if (ps >= 1 && ps <= 300) c.pubSecs = (uint16_t)ps;   /*ignore junk*/
             }
             if (!(c.highTemp > c.lowTemp)) { c.highTemp = 43.0f; c.lowTemp = 24.0f; }
             float maxHysteresis =

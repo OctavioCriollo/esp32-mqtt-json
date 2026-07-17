@@ -44,6 +44,7 @@ struct AppConfig {
     float pwmN;              /*PWM curve floor (0..1): fan minimum, held at/below lowTemp*/
     float pwmP;              /*PWM curve exponent (1..10): 1=linear, 2=parabolic*/
     char caCert[3072];       /*custom broker CA (PEM); empty = compiled-in factory CA*/
+    uint16_t pubSecs;        /*MQTT publish interval in seconds (1..300)*/
 };
 
 class ConfigStore {
@@ -82,6 +83,7 @@ public:
         cfg.pwmN = _prefs.getFloat("pwmN", 0.1f);
         cfg.pwmP = _prefs.getFloat("pwmP", 1.0f);
         _getStr("caCert", cfg.caCert, sizeof(cfg.caCert), "");
+        cfg.pubSecs = _prefs.getUShort("pubSecs", 1);   /*default = today's 1 s cadence*/
         _prefs.end();
         /*Sanity: a broken saved range must never disable cooling.*/
         if (!(cfg.highTemp > cfg.lowTemp)) { cfg.highTemp = 43.0f; cfg.lowTemp = 24.0f; }
@@ -97,6 +99,7 @@ public:
         /*Sanity: keep the PWM curve params in their valid ranges.*/
         if (!(cfg.pwmN >= 0.0f && cfg.pwmN <= 1.0f)) cfg.pwmN = 0.1f;
         if (!(cfg.pwmP >= 1.0f && cfg.pwmP <= 10.0f)) cfg.pwmP = 1.0f;
+        if (cfg.pubSecs < 1 || cfg.pubSecs > 300) cfg.pubSecs = 1;
     }
 
     bool save(){
@@ -121,6 +124,7 @@ public:
         _prefs.putFloat("pwmN",       cfg.pwmN);
         _prefs.putFloat("pwmP",       cfg.pwmP);
         _prefs.putString("caCert",    cfg.caCert);
+        _prefs.putUShort("pubSecs",   cfg.pubSecs);
         _prefs.end();
         return true;
     }

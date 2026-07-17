@@ -71,7 +71,6 @@ MQTT mqtt(WIFIClient);
 
 /*Definicion Variable Globales:
 ====================================================*/
-unsigned long delayTime = 1000;
 //Timer<1000> timer;   /*parked with the tachometer feature*/
 
 volatile float pwm = 100;
@@ -540,7 +539,7 @@ void loop() {
       return;   /*stay in rescue; portal keeps serving*/
     }
   }
-  if (millis() - last_time > delayTime){
+  if (millis() - last_time > (ulong)configStore.cfg.pubSecs * 1000UL){   /*portal-configurable publish cadence*/
     last_time = current_time;
     /*Snapshot under mutex, network OUTSIDE it: a slow TLS handshake
     must not stall the control task.*/

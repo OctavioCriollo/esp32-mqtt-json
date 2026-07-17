@@ -352,7 +352,6 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <div class="f-full"><label>Publish interval</label><select name="pubSecs">%PUBSECSOPTS%</select></div>
 <div class="f-full"><label>Subscribe topic (control)</label><input value="%TOPICSUB%" readonly style="color:var(--mut)"></div>
 </div>
-<button type="submit">Save and Restart</button></form>
 <div class="f-full" style="margin-top:14px"><label>CA Certificate &middot; <span id="caState" style="color:var(--accent)">%CACERTSTATE%</span></label>
 <input type="file" id="caFile" accept=".pem,.crt,.cer,.txt">
 <div class="mrow" style="margin-top:8px">
@@ -361,6 +360,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 </div>
 <div class="sub" id="caMsg" style="font-size:.74rem;color:var(--mut);min-height:1.1em;margin-top:6px">&nbsp;</div>
 </div>
+<button type="submit">Save and Restart</button></form>
 </section>
 </div>
 

@@ -12,9 +12,7 @@ live monitoring, tuning and OTA updates — every operating parameter is
 runtime-configurable from the browser, no recompile in the field.
 
 <p align="center">
-  <img src="images/dashboard-telemetry-mobile.png" width="260" alt="Telemetry (mobile)">
-  <img src="images/dashboard-control-mobile.png" width="260" alt="Control — PWM gauges & relay mapping (mobile)">
-  <img src="images/dashboard-pwm-curve-mobile.png" width="260" alt="PWM curve editor (mobile)">
+  <img src="images/dashboard-telemetry-mobile.png" width="300" alt="NT FAN Controller — dashboard (mobile)">
 </p>
 
 ## Highlights
@@ -51,13 +49,15 @@ the layout never re-renders), snapshot restore on reload, and touch-optimized
 controls. Works in station mode and in the rescue AP.
 
 <p align="center">
+  <img src="images/dashboard-telemetry-mobile.png" width="260" alt="Telemetry tab (mobile)">
+  <img src="images/dashboard-control-mobile.png" width="260" alt="Control tab — PWM gauges & relay mapping (mobile)">
   <img src="images/dashboard-network-mobile.png" width="260" alt="Network tab — WiFi & MQTT setup (mobile)">
-  <img src="images/dashboard-device-mobile.png" width="260" alt="Device tab — identity & OTA (mobile)">
-  <img src="images/dashboard-hysteresis-mobile.png" width="260" alt="Hysteresis editor (mobile)">
 </p>
 
 <p align="center">
-  <img src="images/dashboard-telemetry-desktop.png" alt="Telemetry (desktop)">
+  <img src="images/dashboard-device-mobile.png" width="260" alt="Device tab — identity & OTA (mobile)">
+  <img src="images/dashboard-pwm-curve-mobile.png" width="260" alt="PWM curve editor (popup)">
+  <img src="images/dashboard-hysteresis-mobile.png" width="260" alt="Hysteresis editor (popup)">
 </p>
 
 - **Telemetry** — cabinet temperature with history graph and level colors,

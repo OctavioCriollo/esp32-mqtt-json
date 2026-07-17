@@ -43,6 +43,7 @@ struct AppConfig {
     uint8_t relayMap[4];     /*OUT1-4 -> signal: 0=free 1=tempAlarm 2=doorOpenAlarm 3=fanAlarm*/
     float pwmN;              /*PWM curve floor (0..1): fan minimum, held at/below lowTemp*/
     float pwmP;              /*PWM curve exponent (1..10): 1=linear, 2=parabolic*/
+    char caCert[3072];       /*custom broker CA (PEM); empty = compiled-in factory CA*/
 };
 
 class ConfigStore {
@@ -80,6 +81,7 @@ public:
         }
         cfg.pwmN = _prefs.getFloat("pwmN", 0.1f);
         cfg.pwmP = _prefs.getFloat("pwmP", 1.0f);
+        _getStr("caCert", cfg.caCert, sizeof(cfg.caCert), "");
         _prefs.end();
         /*Sanity: a broken saved range must never disable cooling.*/
         if (!(cfg.highTemp > cfg.lowTemp)) { cfg.highTemp = 43.0f; cfg.lowTemp = 24.0f; }
@@ -118,6 +120,7 @@ public:
         _prefs.putBytes("relayMap",   cfg.relayMap, sizeof(cfg.relayMap));
         _prefs.putFloat("pwmN",       cfg.pwmN);
         _prefs.putFloat("pwmP",       cfg.pwmP);
+        _prefs.putString("caCert",    cfg.caCert);
         _prefs.end();
         return true;
     }

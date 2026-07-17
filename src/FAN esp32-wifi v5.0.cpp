@@ -130,6 +130,12 @@ TaskHandle_t controlTaskHandle;
 void controlTask(void*);
 bool fanGeneralAlarm();   /*general fan alarm per cfg.fanAlarmLogic (0=OR/1=AND/2=FAN1/3=FAN2)*/
 void applyRelayMapping();   /*point each alarm actuator at its NVS-mapped relay*/
+/*Broker CA for TLS: the NVS-stored PEM when one was uploaded from the portal,
+else the compiled-in factory CA. cfg lives for the whole runtime, so the
+pointer stays valid for the TLS session.*/
+const char* activeCaCert(){
+  return configStore.cfg.caCert[0] ? configStore.cfg.caCert : CA_CERT;
+}
 
 void setup(){
   serial_setup(115200);
@@ -182,7 +188,7 @@ void setup(){
     #ifdef MQTT_TLS_INSECURE
     WIFIClient.setInsecure();   /*Diagnostics only: no certificate validation*/
     #else
-    WIFIClient.setCACert(CA_CERT);
+    WIFIClient.setCACert(activeCaCert());
     #endif
     configTime((long)(configStore.cfg.tzOffset*3600), DAYLIGHT_OFFSET_SEC, NTP_SERVER);
     /*Real-cert TLS validates the broker certificate's dates against the
@@ -556,7 +562,7 @@ void loop() {
       #ifdef MQTT_TLS_INSECURE
       WIFIClient.setInsecure();
       #else
-      WIFIClient.setCACert(CA_CERT);
+      WIFIClient.setCACert(activeCaCert());
       #endif
       /*Reconnect backoff: with the broker down, a TLS handshake every
       second churns ~40 KB of heap per attempt and blocks this task for

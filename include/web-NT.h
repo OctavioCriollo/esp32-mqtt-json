@@ -352,6 +352,14 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <div class="f-full"><label>Subscribe topic (control)</label><input value="%TOPICSUB%" readonly style="color:var(--mut)"></div>
 </div>
 <button type="submit">Save and Restart</button></form>
+<div class="f-full" style="margin-top:14px"><label>CA Certificate &middot; <span id="caState" style="color:var(--accent)">%CACERTSTATE%</span></label>
+<textarea id="caPem" rows="4" placeholder="-----BEGIN CERTIFICATE-----" style="width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);font-size:.72rem;font-family:monospace;resize:vertical"></textarea>
+<div class="mrow" style="margin-top:8px">
+<button type="button" style="margin-top:0;flex:1" onclick="caSave()">Save Certificate</button>
+<button type="button" style="margin-top:0;flex:1;background:none;border:1px solid var(--line);color:var(--mut)" onclick="caReset()">Factory CA</button>
+</div>
+<div class="sub" id="caMsg" style="min-height:1.1em;margin-top:6px">&nbsp;</div>
+</div>
 </section>
 </div>
 
@@ -555,6 +563,21 @@ document.querySelectorAll('form[action="/api/config"]').forEach(function(f){f.on
  return false;};});
 function otaMsg2(txt,cvar){var m=document.getElementById('otaLine');
  m.textContent=txt;m.style.color=css(cvar).trim();m.style.opacity='1';}
+function caMsgSet(t,cvar){var m=document.getElementById('caMsg');m.textContent=t;m.style.color=css(cvar).trim();}
+function caSave(){var p=document.getElementById('caPem').value.trim();
+ if(p.indexOf('-----BEGIN CERTIFICATE-----')!==0){caMsgSet('Paste a PEM certificate (-----BEGIN CERTIFICATE-----)','--warn');return;}
+ var b=new URLSearchParams();b.append('pem',p);
+ fetch('/api/cacert',{method:'POST',body:b}).then(function(r){
+  if(!r.ok)return r.text().then(function(t){throw t});return r.json();}).then(function(){
+  document.getElementById('caState').textContent='Custom';
+  document.getElementById('caPem').value='';
+  caMsgSet('Saved ✓ — applies on the next MQTT reconnect/restart','--ok');
+ }).catch(function(e){caMsgSet((''+e)||'Save failed','--bad');});}
+function caReset(){var b=new URLSearchParams();b.append('action','reset');
+ fetch('/api/cacert',{method:'POST',body:b}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(){
+  document.getElementById('caState').textContent='Factory (Let’s Encrypt)';
+  caMsgSet('Factory CA restored ✓','--ok');
+ }).catch(function(){caMsgSet('Reset failed','--bad');});}
 var _ota=document.querySelector('form[action="/update"]');
 if(_ota)_ota.onsubmit=function(){
  document.getElementById('otaLine').innerHTML='&nbsp;';   /*limpia el resultado anterior al reintentar*/
@@ -836,6 +859,7 @@ private:
         page.replace("%TEMPHYST%",   String(_store->cfg.tempHysteresis, 1));
         page.replace("%PWMN%",       String(_store->cfg.pwmN, 2));
         page.replace("%PWMP%",       String(_store->cfg.pwmP, 2));
+        page.replace("%CACERTSTATE%", _store->cfg.caCert[0] ? "Custom" : "Factory (Let&#39;s Encrypt)");
         page.replace("%MQTTCITY%",   _store->cfg.mqttCity);
         page.replace("%MQTTSITE%",   _store->cfg.mqttSite);
         /*Device-identity tags shown in the dashboard header so the operator
@@ -1047,6 +1071,37 @@ public:
 
         /*PWM curve (Fan PWM Curve popup): n=floor(0..1), p=exponent(1..10),
         shared by both fans. Applied live (control loop reads cfg) -- no reboot.*/
+        /*Broker CA certificate: paste-a-PEM stored in NVS; action=reset
+        returns to the compiled-in factory CA. Applied on the next MQTT
+        (re)connect -- typically the Save-and-Restart of a broker change.*/
+        _server.on("/api/cacert", HTTP_POST, [this](AsyncWebServerRequest* req){
+            if (!_auth(req)) return;
+            AppConfig& c = _store->cfg;
+            if (req->hasParam("action", true) &&
+                req->getParam("action", true)->value() == "reset"){
+                c.caCert[0] = '\0';
+                if (!_store->save()){ req->send(500, "text/plain", "Save failed"); return; }
+                req->send(200, "application/json", "{\"ok\":true,\"custom\":false}");
+                return;
+            }
+            if (!req->hasParam("pem", true)){
+                req->send(400, "text/plain", "Missing pem");
+                return;
+            }
+            String pem = req->getParam("pem", true)->value();
+            pem.trim();
+            if (pem.indexOf("-----BEGIN CERTIFICATE-----") != 0 ||
+                pem.indexOf("-----END CERTIFICATE-----") < 0 ||
+                pem.length() + 2 > sizeof(c.caCert)){
+                req->send(400, "text/plain", "Not a PEM certificate (or too large)");
+                return;
+            }
+            pem += "\n";   /*mbedTLS wants the PEM newline-terminated*/
+            strlcpy(c.caCert, pem.c_str(), sizeof(c.caCert));
+            if (!_store->save()){ req->send(500, "text/plain", "Save failed"); return; }
+            req->send(200, "application/json", "{\"ok\":true,\"custom\":true}");
+        });
+
         _server.on("/api/pwmcurve", HTTP_POST, [this](AsyncWebServerRequest* req){
             if (!_auth(req)) return;
             AppConfig& c = _store->cfg;

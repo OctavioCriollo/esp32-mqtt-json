@@ -358,7 +358,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 <button type="button" style="margin-top:0;flex:1" onclick="caSave()">Save Certificate</button>
 <button type="button" style="margin-top:0;flex:1;background:none;border:1px solid var(--line);color:var(--mut)" onclick="caReset()">Factory CA</button>
 </div>
-<div class="sub" id="caMsg" style="min-height:1.1em;margin-top:6px">&nbsp;</div>
+<div class="sub" id="caMsg" style="font-size:.74rem;color:var(--mut);min-height:1.1em;margin-top:6px">&nbsp;</div>
 </div>
 </section>
 </div>

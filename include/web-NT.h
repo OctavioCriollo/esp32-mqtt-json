@@ -902,11 +902,11 @@ private:
         /*Raw MAC (colon form) shown read-only in the Device tab.*/
         page.replace("%MAC%", String(_mc));
         /*Pub/sub topics shown read-only in MQTT Setup, lowercased to match the
-        main's build (operator/city/site-MAC/subsystem/{telemetria,control}).*/
+        main's build (operator/city/site-MAC/subsystem/{telemetry,control}).*/
         String _base = String(_store->cfg.mqttOperator) + "/" + _store->cfg.mqttCity +
                        "/" + _siteId + "/" + _store->cfg.mqttSubsystem;
         _base.toLowerCase();
-        page.replace("%TOPICPUB%", _base + "/telemetria");
+        page.replace("%TOPICPUB%", _base + "/telemetry");
         page.replace("%TOPICSUB%", _base + "/control");
         /*Stored/shown capitalized; the topic lowercases them at build time.*/
         static const char* const opers[]  = {"Claro","CNT","Tigo"};

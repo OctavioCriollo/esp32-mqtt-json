@@ -56,7 +56,7 @@ const char* mqtt_server;
 uint16_t mqtt_port;
 const char* mqtt_user;
 const char* mqtt_password;
-String mqtt_topic_pub;   /*built from config in setup(): oper/site/subsys/telemetria*/
+String mqtt_topic_pub;   /*built from config in setup(): oper/site/subsys/telemetry*/
 String mqtt_topic_sub;   /*built from config in setup(): oper/site/subsys/control*/
 String mqtt_ID;          /*built from config in setup()*/
 
@@ -152,9 +152,9 @@ void setup(){
   mqtt.setUser(mqtt_user);
   mqtt.setPassword(mqtt_password);
   /*Build the topic hierarchy and client id from config:
-  operator/city/site-MAC/subsystem/{telemetria,control}. The device MAC is
+  operator/city/site-MAC/subsystem/{telemetry,control}. The device MAC is
   appended to the site, so it is globally unique; one firmware serves the
-  whole fleet and wildcard ACLs work (e.g. claro/+/+/power/telemetria).*/
+  whole fleet and wildcard ACLs work (e.g. claro/+/+/power/telemetry).*/
   /*Read the factory MAC straight from eFuse (esp_read_mac): always valid,
   independent of WiFi init/mode/timing. Same value WiFi.macAddress() gives
   once WiFi is up, so the topic/client-id match the STA MAC on the network.
@@ -174,7 +174,7 @@ void setup(){
                      configStore.cfg.mqttCity + "/" + siteId + "/" +
                      configStore.cfg.mqttSubsystem;
   topicBase.toLowerCase();
-  mqtt_topic_pub = topicBase + "/telemetria";
+  mqtt_topic_pub = topicBase + "/telemetry";
   mqtt_topic_sub = topicBase + "/control";
   mqtt.setTopicPUB(mqtt_topic_pub.c_str());
   mqtt.setTopicSUB(mqtt_topic_sub.c_str());

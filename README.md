@@ -97,14 +97,14 @@ Sensor failure (NAN / −127) is a separate alarm: fans failsafe to 100 % and th
 Topics are built at boot from the NVS identity (all lowercase):
 
 ```
-<operator>/<city>/<site>-<MAC>/<subsystem>/telemetria   device → broker
+<operator>/<city>/<site>-<MAC>/<subsystem>/telemetry   device → broker
 <operator>/<city>/<site>-<MAC>/<subsystem>/control      broker → device
-e.g. claro/guayaquil/rbs-073-a0b1c2d3e4f5/power/telemetria
+e.g. claro/guayaquil/rbs-073-a0b1c2d3e4f5/power/telemetry
 ```
 
 The MQTT **client ID** is `<site>-<MAC>` — globally unique with zero per-board
 configuration, so one firmware serves a whole fleet. Wildcard-friendly for
-dashboards and ACLs: `claro/+/+/power/telemetria` = every power subsystem.
+dashboards and ACLs: `claro/+/+/power/telemetry` = every power subsystem.
 
 **Broker** — verified against **EMQX** over TLS (port 8883, username/password).
 Any MQTT 3.1.1 broker works; the CA certificate compiled into the firmware

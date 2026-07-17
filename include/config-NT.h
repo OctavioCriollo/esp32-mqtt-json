@@ -32,7 +32,7 @@ struct AppConfig {
     float lowTemp;    /*PWM = 0% at/below*/
     float tempHysteresis; /*High-temp alarm reset band in deg C*/
     float tzOffset;   /*UTC offset in hours for SNTP (e.g. -5.0 = Ecuador)*/
-    /*MQTT topic: operator/city/site-MAC/subsystem/{telemetria,control}. The
+    /*MQTT topic: operator/city/site-MAC/subsystem/{telemetry,control}. The
     device MAC is appended to the site at boot, so it is globally unique and
     one firmware serves the whole fleet.*/
     char mqttOperator[24];   /*claro, cnt, tigo*/

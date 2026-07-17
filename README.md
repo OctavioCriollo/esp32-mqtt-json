@@ -1,122 +1,203 @@
-# ESP32-MQTT-JSON: JSON and MQTT, FAN Controller with PWM
-ESP32 device send data monitoring in JSON format to MQTT server
+# NT FAN Controller
 
-## Description
-This project uses an ESP32 to control fans based on the temperature measured by a DS18B20 sensor. It connects to a WiFi network and uses MQTT for communication with a MQTT server or broker. The ESP32 send to the broker the data in JSON format.
+[![Build firmware](https://github.com/OctavioCriollo/nt-fan-controller/actions/workflows/build.yml/badge.svg)](https://github.com/OctavioCriollo/nt-fan-controller/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/OctavioCriollo/nt-fan-controller)](https://github.com/OctavioCriollo/nt-fan-controller/releases)
+[![Platform](https://img.shields.io/badge/platform-pioarduino%20%7C%20ESP32-blue)](https://github.com/pioarduino/platform-espressif32)
 
-![System Diagram](images/fan-controller-power-plant.png)
+Production ESP32 firmware for the **NT-IoT Board v3.0** (Network Telemetrix) — a
+temperature-driven PWM fan controller for telecom power cabinets (Power ELTEK
+rectifiers). It replaces always-on cooling with a demand-driven curve, publishes
+JSON telemetry over **MQTT/TLS**, and ships a **mobile-first web dashboard** for
+live monitoring, tuning and OTA updates — every operating parameter is
+runtime-configurable from the browser, no recompile in the field.
 
-## v6.0 Modernization (July 2026)
+<p align="center">
+  <img src="images/dashboard-telemetry-mobile.png" width="260" alt="Telemetry (mobile)">
+  <img src="images/dashboard-control-mobile.png" width="260" alt="Control — PWM gauges & relay mapping (mobile)">
+  <img src="images/dashboard-pwm-curve-mobile.png" width="260" alt="PWM curve editor (mobile)">
+</p>
 
-The firmware was modernized end to end. Highlights:
+## Highlights
 
-- **Platform:** [pioarduino](https://github.com/pioarduino/platform-espressif32) (Arduino core 3.x / ESP-IDF 5.x) — the espressif32 PlatformIO platform is frozen upstream.
-- **Security:** credentials moved out of source into `include/secrets.h` (gitignored; copy `include/secrets.h.example`). Real TLS validation of the MQTT broker against ISRG Root X1 (`include/ca_cert.h`).
-- **Robustness:** fan control runs in a dedicated FreeRTOS task decoupled from networking — WiFi/MQTT outages can no longer stall thermal regulation. Hardware watchdog (30 s). Degraded boot: a failed DS18B20 no longer hangs the device (fans failsafe to 100%, alarm reported over MQTT).
-- **Web portal:** `http://fan-controller.local` — live status, runtime configuration (WiFi/MQTT credentials, temperature thresholds; stored in NVS, no recompile needed) and **browser OTA** firmware updates. HTTP Basic auth (`admin` / configurable password).
-- **AP rescue mode:** if WiFi association fails at boot, the device raises the `FanController-Setup` access point with the portal at `192.168.4.1`.
-- **CI/CD:** every push compiles the firmware on GitHub Actions; pushing a `v*` tag publishes a GitHub Release with the versioned `.bin` (flash it via the OTA page).
+- **Demand-driven cooling** — fan duty follows a configurable power-law curve
+  `PWM = n + (1−n)·xᵖ` between the Low/High temperature thresholds
+  (`p = 1` linear, `p = 2` parabolic; floor `n` for minimum airflow). Edited by
+  **dragging two points on a live graph** in the dashboard.
+- **Configurable alarm hysteresis** — the high-temperature alarm is a Schmitt
+  trigger with a draggable reset band (clamped to 20 % of the range), so the
+  alarm relay never chatters around the threshold.
+- **Real fan feedback** — tachometer RPM per fan (IRAM ISR pulse counting with
+  critical sections), with door-gated failure alarms and selectable general
+  alarm logic (`FAN1 OR/AND FAN2`, single-fan).
+- **Assignable relay outputs** — map temperature / door / fan alarms to any of
+  the 4 relays from the dashboard, with mutual exclusion, persisted in NVS.
+- **MQTT/TLS JSON telemetry** — CA-validated TLS, fleet-ready topic hierarchy,
+  MAC-based client identity. **Verified against an EMQX broker.**
+- **Zero-recompile operations** — WiFi, broker, identity, thresholds, curve,
+  hysteresis and relay map all live in NVS, editable from the portal; control
+  parameters apply live (no reboot).
+- **Self-recovering** — thermal failsafe (fans → 100 % on sensor loss), WiFi
+  AP-rescue mode with automatic STA recovery, hardware watchdog, SNTP time.
+- **Browser OTA + CI/CD** — every push compiles on GitHub Actions; a `v*` tag
+  publishes a release whose `.bin` uploads straight from the OTA page, with
+  progress and success/error feedback.
 
-### Quickstart
+## Web dashboard
 
-```bash
-cp include/secrets.h.example include/secrets.h   # fill in your values
-pio run -t upload                                # first flash over USB
-# subsequent updates: portal -> Firmware OTA -> upload the CI-built .bin
+A single self-contained page served from the ESP32 itself (PROGMEM, no
+filesystem, no external assets, chunked streaming). Four tabs — **Telemetry /
+Control / Network / Device** — with a 2-second data-only refresh (values update,
+the layout never re-renders), snapshot restore on reload, and touch-optimized
+controls. Works in station mode and in the rescue AP.
+
+![Telemetry desktop](images/dashboard-telemetry-desktop.png)
+
+![Hysteresis desktop](images/dashboard-hysteresis-desktop.png)
+
+<p align="center">
+  <img src="images/dashboard-hysteresis-mobile.png" width="300" alt="Hysteresis editor (mobile)">
+</p>
+
+- **Telemetry** — cabinet temperature with history graph and level colors,
+  sensor-health vs temperature-level badges, live thresholds (applied without
+  reboot), per-fan RPM, fan/door alarms, WiFi signal, uptime.
+- **Control** — live PWM gauges (tap → curve editor) and relay-output mapping.
+- **Network** — WiFi and MQTT settings, each with its own save-and-restart;
+  read-only client ID and pub/sub topics.
+- **Device** — operator / city / site / subsystem identity, timezone, MAC,
+  portal password and **Firmware OTA** with upload progress.
+
+## Control math
+
+**Fan curve** (both fans, applied every control cycle):
+
+```
+x   = (T − LOW_T) / (HIGH_T − LOW_T)          clamped to 0..1
+PWM = PWM_MAX · ( n + (1 − n) · x^p )         n = floor 0..1, p = exponent 1..10
 ```
 
-## Features
-- WiFi connection.
-- MQTT connection and communication.
-- Temperature monitoring with DS18B20 sensor.
-- Fan control using PWM signals.
-- Cabinet state monitoring (door open/closed).
-- Alarm generation for temperature and fan failures.
-- Sending monitoring data and alarms via MQTT.
+`T ≥ HIGH_T` → 100 %. `T ≤ LOW_T` → `n·PWM_MAX` (set `n = 0` for off when
+cold). Defaults `n = 0.10`, `p = 1` reproduce a classic linear ramp.
 
-## Requirements
-- ESP32
-- DS18B20 temperature sensor
-- Fans with PWM control
-- Door state sensor (optional)
+**High-temperature alarm** (drives the mapped relay):
 
-## Required Libraries
-To use this code, you need to install the following libraries:
-- `ArduinoJson` (v7) for JSON serialization and deserialization.
-- `PubSubClient` for MQTT communication (TLS via `WiFiClientSecure` + CA validation).
-- `ESPAsyncWebServer` + `AsyncTCP` (ESP32Async forks) for the web portal.
-- `Preferences` (NVS) for persistent runtime configuration.
-- Library files for specific sensors and actuators used in your project, such as:
-  - `sensor-NT-02.h` for the temperature sensor.
-  - `wireless-NT.h` for WiFi connection.
-  - `mqtt-NT.h` for MQTT configuration.
-  - `IoT-NT.h` for IoT device management.
-  - Other library files as needed for your specific hardware setup.
+```
+trip  ON  : T > HIGH_T
+hold  ON  : T > HIGH_T − n        (n = reset band, default 3 °C)
+reset OFF : T ≤ HIGH_T − n
+```
 
-## Configuration
-1. Modify the `ssid` and `password` constants to set up the WiFi connection.
-2. Adjust the MQTT connection parameters (`MQTT_SERVER`, `MQTT_PORT`, `MQTT_CLIENT_USER`, `MQTT_CLIENT_PASS`).
-3. Set the temperature limits (`HIGH_TEMP` and `LOW_TEMP`).
-4. (Optional) Configure the door state sensor and adjust the control logic as needed.
+Sensor failure (NAN / −127) is a separate alarm: fans failsafe to 100 % and the
+`SENSOR` badge reports `FAILURE` while the temperature alarm reports honestly.
 
-## Usage
-Upload the code to an ESP32 and ensure it is connected to the WiFi network and MQTT broker. The device will monitor the temperature and control the fans automatically. Monitoring data and alarms will be sent to the MQTT broker.
+## MQTT telemetry
 
-## JSON Data Format
-Monitoring data and alarms are sent to the MQTT broker in a JSON format structured as follows:
+Topics are built at boot from the NVS identity (all lowercase):
+
+```
+<operator>/<city>/<site>-<MAC>/<subsystem>/telemetria   device → broker
+<operator>/<city>/<site>-<MAC>/<subsystem>/control      broker → device
+e.g. claro/guayaquil/rbs-073-a0b1c2d3e4f5/power/telemetria
+```
+
+The MQTT **client ID** is `<site>-<MAC>` — globally unique with zero per-board
+configuration, so one firmware serves a whole fleet. Wildcard-friendly for
+dashboards and ACLs: `claro/+/+/power/telemetria` = every power subsystem.
+
+**Broker** — verified against **EMQX** over TLS (port 8883, username/password).
+Any MQTT 3.1.1 broker works; the CA certificate compiled into the firmware
+(`include/ca_cert.h`) must match your broker's certificate chain.
+
+The device publishes one JSON document per cycle (representative, trimmed):
 
 ```json
 {
-  "device": "Controller",
-  "type": "ESP_32",
-  "location": "/power/climatizacion",
+  "id": "Controller",
+  "model": "ESP_32",
+  "mac": "A0:B1:C2:D3:E4:F5",
+  "ip": "192.168.1.147",
+  "timestamp": "2026-07-17T04:45:12",
   "sensors": [
-    {
-      "name": "temp1",
-      "type": "DS18B20",
-      "temperature": 25,
-      "status": "Temperature OK",
-      "alarm": false
-    }
+    { "id": "temp1", "model": "DS18B20", "temperature": 36.52,
+      "upper": 43.0, "lower": 24.0, "status": { "alm": false, "code": "OK" } },
+    { "id": "fan1", "model": "TACHOMETER", "rpm": 2340,
+      "status": { "alm": false, "code": "FAN1 ON" } },
+    { "id": "fan2", "model": "TACHOMETER", "rpm": 2310,
+      "status": { "alm": false, "code": "FAN2 ON" } },
+    { "id": "doorOpenMon", "model": "DIGITAL_STATE", "state": false }
   ],
   "actuators": [
-    {
-      "name": "fan1",
-      "type": "PWM",
-      "value": 100,
-      "status": "FAN1 Working!",
-      "alarm": false
-    },
-    {
-      "name": "fan2",
-      "type": "PWM",
-      "value": 100,
-      "status": "FAN2 Working!",
-      "alarm": false
-    },
-    {
-      "name": "doorOpenAlarm",
-      "type": "PINCONTROL",
-      "status": "Door is CLOSE",
-      "alarm": false
-    },
-    {
-      "name": "fanAlarm",
-      "type": "PINCONTROL",
-      "status": "FAN's is OK!",
-      "alarm": false
-    }
+    { "id": "speedFan1", "model": "PWM", "value": 65.97 },
+    { "id": "speedFan2", "model": "PWM", "value": 65.97 },
+    { "id": "doorOpenAlarm", "model": "DIGITAL_CONTROL", "state": false },
+    { "id": "fanAlarm",      "model": "DIGITAL_CONTROL", "state": true },
+    { "id": "tempAlarm",     "model": "DIGITAL_CONTROL", "state": false }
   ]
 }
-
 ```
 
-## IoT development board
-Board on which the code was developed, you can watch the following video in Youtube:
+Timestamps are real (SNTP, timezone configurable from the portal).
 
-[![Project Demo](https://img.youtube.com/vi/xHSDZ5ZZDWI/sddefault.jpg)](https://www.youtube.com/watch?v=xHSDZ5ZZDWI)
+## Hardware — NT-IoT Board v3.0
 
-Click on the image above to watch the video.
+Multipurpose plug-and-play IoT PCB (Network Telemetrix): −48 VDC (telecom) or
+5 VDC supply with reverse-polarity and short-circuit protection.
 
-## Contributions
-Contributions to this project are welcome. Please open an issue or a pull request to suggest improvements or add features.
+| Resource | This firmware uses |
+| --- | --- |
+| 2 × PWM fan ports (48 V, fused) + tach inputs | both — speed command + RPM feedback |
+| 4 × relay outputs (NC/COM/NO) | 3 mapped alarms + 1 spare (assignable) |
+| 4 × digital inputs | 1 — cabinet door switch |
+| 1-Wire port | DS18B20 cabinet temperature |
+| I2C port | BME280 driver ready (temp/humidity/pressure) |
+| 4 × analog inputs (ADC1), SPI, BT | available for future use |
+
+[![Board video](https://img.youtube.com/vi/xHSDZ5ZZDWI/sddefault.jpg)](https://www.youtube.com/watch?v=xHSDZ5ZZDWI)
+
+*Click to watch the board overview on YouTube.*
+
+![System diagram](images/fan-controller-power-plant.png)
+
+## Getting started
+
+```bash
+cp secrets.example.h include/secrets.h     # first-boot defaults (WiFi/MQTT)
+pio run -t upload                          # first flash over USB
+```
+
+After the first boot everything is managed from the portal:
+
+1. If the configured WiFi is unreachable the board raises the
+   **`FanController-Setup`** access point → portal at `http://192.168.4.1`.
+2. On your LAN: `http://fan-controller.local` (HTTP Basic auth, `admin` +
+   configurable password).
+3. Subsequent updates: **Device → Firmware OTA** → upload the CI-built `.bin`.
+
+> NVS wins over `secrets.h` after the first save — the compile-time values are
+> first-boot defaults only.
+
+## Architecture notes
+
+- **pioarduino** platform (Arduino core 3.x / ESP-IDF 5.x), ArduinoJson 7,
+  maintained `esp32async` web-server forks.
+- Fan control runs in a dedicated **FreeRTOS task** decoupled from networking —
+  a WiFi/MQTT outage can never stall thermal regulation.
+- Tachometer pulses are counted in **IRAM ISRs** guarded by `portMUX` critical
+  sections (read-and-clear is atomic; no lost edges).
+- The dashboard page streams from PROGMEM via chunked responses with a
+  size-tracking reserve — stable even on a fragmented heap.
+- Single alarm channel per component (`status = {alm, code}`): intrinsic health
+  is set by the driver, threshold policy by the control loop.
+
+## Project ecosystem
+
+This firmware is the **golden template** of the NT-IoT Board family. The shared
+core (sensor/actuator classes, config store, MQTT, portal) is being extracted
+into an **NT-core** library that the sibling firmwares (generator monitoring,
+heater control) will consume. Full engineering documentation (design docs,
+changelogs, audits, roadmaps) is maintained in the parent NT-IoT Board
+workspace.
+
+## Contributing
+
+Contributions are welcome — open an issue or a pull request.

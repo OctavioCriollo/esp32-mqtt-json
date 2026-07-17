@@ -353,7 +353,7 @@ header{justify-content:center;text-align:center}.brand{justify-content:center}.c
 </div>
 <button type="submit">Save and Restart</button></form>
 <div class="f-full" style="margin-top:14px"><label>CA Certificate &middot; <span id="caState" style="color:var(--accent)">%CACERTSTATE%</span></label>
-<textarea id="caPem" rows="4" placeholder="-----BEGIN CERTIFICATE-----" style="width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);font-size:.72rem;font-family:monospace;resize:vertical"></textarea>
+<input type="file" id="caFile" accept=".pem,.crt,.cer,.txt">
 <div class="mrow" style="margin-top:8px">
 <button type="button" style="margin-top:0;flex:1" onclick="caSave()">Save Certificate</button>
 <button type="button" style="margin-top:0;flex:1;background:none;border:1px solid var(--line);color:var(--mut)" onclick="caReset()">Factory CA</button>
@@ -564,15 +564,20 @@ document.querySelectorAll('form[action="/api/config"]').forEach(function(f){f.on
 function otaMsg2(txt,cvar){var m=document.getElementById('otaLine');
  m.textContent=txt;m.style.color=css(cvar).trim();m.style.opacity='1';}
 function caMsgSet(t,cvar){var m=document.getElementById('caMsg');m.textContent=t;m.style.color=css(cvar).trim();}
-function caSave(){var p=document.getElementById('caPem').value.trim();
- if(p.indexOf('-----BEGIN CERTIFICATE-----')!==0){caMsgSet('Paste a PEM certificate (-----BEGIN CERTIFICATE-----)','--warn');return;}
- var b=new URLSearchParams();b.append('pem',p);
- fetch('/api/cacert',{method:'POST',body:b}).then(function(r){
-  if(!r.ok)return r.text().then(function(t){throw t});return r.json();}).then(function(){
-  document.getElementById('caState').textContent='Custom';
-  document.getElementById('caPem').value='';
-  caMsgSet('Saved ✓ — applies on the next MQTT reconnect/restart','--ok');
- }).catch(function(e){caMsgSet((''+e)||'Save failed','--bad');});}
+function caSave(){var f=document.getElementById('caFile').files[0];
+ if(!f){caMsgSet('Choose a certificate file first (.pem / .crt)','--warn');return;}
+ var rd=new FileReader();
+ rd.onload=function(){var p=(''+rd.result).trim();
+  if(p.indexOf('-----BEGIN CERTIFICATE-----')!==0){caMsgSet('Not a PEM certificate (must start with -----BEGIN CERTIFICATE-----)','--warn');return;}
+  var b=new URLSearchParams();b.append('pem',p);
+  fetch('/api/cacert',{method:'POST',body:b}).then(function(r){
+   if(!r.ok)return r.text().then(function(t){throw t});return r.json();}).then(function(){
+   document.getElementById('caState').textContent='Custom';
+   document.getElementById('caFile').value='';
+   caMsgSet('Saved ✓ — applies on the next MQTT reconnect/restart','--ok');
+  }).catch(function(e){caMsgSet((''+e)||'Save failed','--bad');});};
+ rd.onerror=function(){caMsgSet('Could not read the file','--bad');};
+ rd.readAsText(f);}
 function caReset(){var b=new URLSearchParams();b.append('action','reset');
  fetch('/api/cacert',{method:'POST',body:b}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(){
   document.getElementById('caState').textContent='Factory (Let’s Encrypt)';

@@ -50,12 +50,14 @@ Control / Network / Device** — with a 2-second data-only refresh (values updat
 the layout never re-renders), snapshot restore on reload, and touch-optimized
 controls. Works in station mode and in the rescue AP.
 
-![Telemetry desktop](images/dashboard-telemetry-desktop.png)
-
-![Hysteresis desktop](images/dashboard-hysteresis-desktop.png)
+<p align="center">
+  <img src="images/dashboard-network-mobile.png" width="260" alt="Network tab — WiFi & MQTT setup (mobile)">
+  <img src="images/dashboard-device-mobile.png" width="260" alt="Device tab — identity & OTA (mobile)">
+  <img src="images/dashboard-hysteresis-mobile.png" width="260" alt="Hysteresis editor (mobile)">
+</p>
 
 <p align="center">
-  <img src="images/dashboard-hysteresis-mobile.png" width="300" alt="Hysteresis editor (mobile)">
+  <img src="images/dashboard-telemetry-desktop.png" alt="Telemetry (desktop)">
 </p>
 
 - **Telemetry** — cabinet temperature with history graph and level colors,
